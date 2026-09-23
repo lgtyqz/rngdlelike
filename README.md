@@ -58,7 +58,7 @@ To add an item:
 4. Ensure its emoji SVG is present in `openmoji-svg-color/`, or map its artwork in `iconPath`.
 5. Add a rules test for the new behavior.
 
-Rarity weights are **60:27:10:3** for Common, Uncommon, Rare, and Legendary, normalized over available rarity groups. Base trinket prices are **$12/$25/$50/$100**. Tools add $5; upgrades add **1/2/4/8** uses according to rarity, with a surcharge for previous upgrades. These are initial balance values, isolated in the catalog and engine for tuning.
+Rarity weights are **60:27:10:3** for Common, Uncommon, Rare, and Legendary, normalized over available rarity groups. Item prices can be set on individual catalog definitions and otherwise fall back to **$12/$25/$50/$100** by rarity. Upgrades always add **1** use; the offered tool is weighted by the relative rarities of the owned tools, and repeat upgrades carry a surcharge. These are initial balance values, isolated in the catalog and engine for tuning.
 
 ## Verify
 

@@ -1,8 +1,8 @@
 export const RARITIES = {
-  common: { label: "Common", weight: 60, price: 12, power: 1 },
-  uncommon: { label: "Uncommon", weight: 27, price: 25, power: 2 },
-  rare: { label: "Rare", weight: 10, price: 50, power: 4 },
-  legendary: { label: "Legendary", weight: 3, price: 100, power: 8 },
+  common: { label: "Common", weight: 60, price: 12 },
+  uncommon: { label: "Uncommon", weight: 27, price: 25 },
+  rare: { label: "Rare", weight: 10, price: 50 },
+  legendary: { label: "Legendary", weight: 3, price: 100 },
 };
 // Definitions are immutable templates. Each owned trinket receives independent metadata.
 /** Creates an immutable trinket definition for the item catalog. */
@@ -14,6 +14,7 @@ const trinket = (
   effect,
   description,
   metadata = {},
+  price,
 ) => ({
   id,
   name,
@@ -22,11 +23,21 @@ const trinket = (
   effect,
   description,
   metadata,
+  ...(price == null ? {} : { price }),
   kind: "trinket",
 });
 
 /** Creates an immutable tool definition for the item catalog. */
-const tool = (id, name, emoji, rarity, effect, description, maxUses = 1) => ({
+const tool = (
+  id,
+  name,
+  emoji,
+  rarity,
+  effect,
+  description,
+  maxUses = 1,
+  price,
+) => ({
   id,
   name,
   emoji,
@@ -34,6 +45,7 @@ const tool = (id, name, emoji, rarity, effect, description, maxUses = 1) => ({
   effect,
   description,
   maxUses,
+  ...(price == null ? {} : { price }),
   kind: "tool",
 });
 export const TRINKETS = [
@@ -242,6 +254,7 @@ export const TOOLS = [
     "common",
     "reroll",
     "Select a reel to roll a new random digit.",
+    3,
   ),
   tool(
     "increment",
@@ -329,13 +342,18 @@ export const TOOLS = [
     "📣",
     "legendary",
     "neighbor",
-    "Copy a reel’s digit to both its neighbors (wrapping at the edges).",
+    "Copy a reel's digit to both its neighbors (wrapping at the edges).",
     3,
   ),
 ];
 export const ITEMS = Object.fromEntries(
   [...TRINKETS, ...TOOLS].map((item) => [item.id, item]),
 );
+
+/** Returns an item's custom price, falling back to its rarity's base price. */
+export function itemPrice(item) {
+  return item.price ?? RARITIES[item.rarity].price;
+}
 
 /**
  * Creates an independently mutable owned instance from an item definition.

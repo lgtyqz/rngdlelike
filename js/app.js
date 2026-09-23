@@ -42,6 +42,20 @@ const COLORS = [
   "#d040e3",
   "#e3409f",
 ];
+const CONFETTI_ICONS = [
+  "openmoji-svg-color/1F389.svg",
+  "openmoji-svg-color/1F38A.svg",
+  "openmoji-svg-color/2728.svg",
+  "openmoji-svg-color/2B50.svg",
+  "openmoji-svg-color/1F3C6.svg",
+  "openmoji-svg-color/1FA99.svg",
+  "openmoji-svg-color/1F388.svg",
+  "openmoji-svg-color/1F308.svg",
+  "openmoji-svg-color/1F48E.svg",
+  "openmoji-svg-color/1F451.svg",
+  "openmoji-svg-color/1F340.svg",
+  "openmoji-svg-color/1F680.svg",
+];
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let state = null,
   calendar = {},
@@ -79,6 +93,46 @@ const number = (value) =>
 /** Waits for an animation delay, shortened when reduced motion is preferred. */
 const sleep = (ms) =>
   new Promise((resolve) => setTimeout(resolve, reducedMotion.matches ? 1 : ms));
+
+/** Bursts local OpenMoji artwork from the center of the goal message. */
+function celebrateGoal(anchor) {
+  if (reducedMotion.matches) return;
+  document.querySelector(".goal-confetti")?.remove();
+  const rect = anchor.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2 + 200;
+  const spread = Math.min(window.innerWidth, 3600);
+  const overlay = document.createElement("div");
+  overlay.className = "goal-confetti";
+  overlay.setAttribute("aria-hidden", "true");
+  for (let i = 0; i < 48; i++) {
+    const particle = document.createElement("img");
+    const drift = (Math.random() - 0.5) * spread;
+    const riseHeight = 160 + Math.random() * 300;
+    particle.className = "goal-confetti-particle";
+    particle.alt = "";
+    particle.src =
+      CONFETTI_ICONS[Math.floor(Math.random() * CONFETTI_ICONS.length)];
+    particle.style.left = `${centerX + (Math.random() - 0.5) * 32}px`;
+    particle.style.top = `${centerY + (Math.random() - 0.5) * 12}px`;
+    particle.style.setProperty("--x-mid", `${drift * 0.32}px`);
+    particle.style.setProperty("--x", `${drift}px`);
+    particle.style.setProperty("--rise", `${riseHeight}px`);
+    particle.style.setProperty(
+      "--fall",
+      `${riseHeight - Math.random() * 160 - 20}px`,
+    );
+    const spin = (Math.random() - 0.5) * 1080;
+    particle.style.setProperty("--spin-mid", `${spin * 0.35}deg`);
+    particle.style.setProperty("--spin", `${spin}deg`);
+    particle.style.setProperty("--size", `${22 + Math.random() * 25}px`);
+    particle.style.setProperty("--delay", `${Math.random() * 0.12}s`);
+    particle.style.setProperty("--duration", `${2.5 + Math.random() * 0.6}s`);
+    overlay.append(particle);
+  }
+  document.body.append(overlay);
+  setTimeout(() => overlay.remove(), 2200);
+}
 
 /** Returns the temporary UI phase when present, otherwise the saved game phase. */
 const phase = () => ui.phase || state?.phase;
@@ -164,6 +218,12 @@ function readSave() {
     )
       return null;
     if (data.mode === "daily" && !validDate(data.date)) return null;
+    for (const offer of data.offers) {
+      if (!offer.empty && offer.kind === "upgrade") {
+        offer.amount = 1;
+        offer.rarity = ITEMS[offer.id].rarity;
+      }
+    }
     return data;
   } catch {
     return null;
@@ -190,9 +250,15 @@ function validDate(value) {
 
 /** Returns the reusable RNGdlelike logo markup. */
 function brand() {
+  const letters = [..."RNGDLE"]
+    .map(
+      (letter, index) =>
+        `<span class="brand-letter" style="--letter-index: ${index}">${letter}</span>`,
+    )
+    .join("");
   return `
     <div class="brand" aria-label="RNGdlelike">
-      <h1>RNGDLE</h1>
+      <h1>${letters}</h1>
       <div class="like" aria-hidden="true">LIKE</div>
     </div>
   `;
@@ -245,7 +311,7 @@ function renderMenu() {
         <div>
           ${button("daily", "PLAY DAILY", "daily")}
           <p class="daily-date">${displayDate}</p>
-          <p class="daily-zone">new luck every day · midnight UTC</p>
+          <p class="daily-zone">new luck every day @ midnight UTC</p>
         </div>
       </div>
       ${
@@ -264,7 +330,7 @@ function renderMenu() {
           ? `
             <p style="margin-top:18px">
               <button class="text-button resume" data-action="resume">
-                Continue your ${saved.mode === "daily" ? "daily " : ""}run · spin ${saved.round}/20 →
+                Continue your ${saved.mode === "daily" ? "daily " : ""}run: spin ${saved.round}/20 →
               </button>
             </p>
           `
@@ -430,7 +496,7 @@ function reels() {
 }
 
 /** Returns the current shop offers and reroll control markup. */
-function offers() {
+function offers(animateSpawn = false) {
   const offerButtons = state.offers
     .map((offer, index) => {
       if (offer.empty)
@@ -451,6 +517,11 @@ function offers() {
             : "TRINKET";
       const soldClass = offer.sold ? "sold" : "";
       const affordabilityClass = state.bank < offer.price ? "unaffordable" : "";
+      const spawnClass =
+        animateSpawn && offer.rarity === "legendary" ? "legendary-spawn" : "";
+      if (offer.rarity === "legendary") {
+        sound.play("legendary");
+      }
       const upgradeLabel =
         offer.kind === "upgrade"
           ? ` upgrade, plus ${offer.amount} uses per spin`
@@ -458,10 +529,11 @@ function offers() {
       const offerLabel = `${offer.sold ? "Sold" : "Buy"} ${esc(def.name)}${upgradeLabel}, ${RARITIES[offer.rarity].label}, $${offer.price}`;
       return `
         <button
-          class="offer ${soldClass} ${affordabilityClass}"
+          class="offer ${soldClass} ${affordabilityClass} ${spawnClass}"
           data-action="buy"
           data-offer="${index}"
           data-item="${offer.id}"
+          style="--offer-index: ${index}"
           aria-label="${offerLabel}"
           aria-disabled="${offer.sold || state.bank < offer.price}"
         >
@@ -515,7 +587,7 @@ function logRow(event, pending = false) {
 }
 
 /** Renders the active run for its current gameplay phase. */
-function renderGame() {
+function renderGame({ animateOffers = false } = {}) {
   const current = phase();
   let content = "",
     action = "";
@@ -523,7 +595,7 @@ function renderGame() {
     content = inventory();
     action = `${button("share", "SHARE")}${button("menu", "PLAY AGAIN!")}`;
   } else if (current === "shop") {
-    content = offers() + inventory();
+    content = offers(animateOffers) + inventory();
     action = button("next", "NEXT ROUND!");
   } else {
     content = reels();
@@ -628,19 +700,19 @@ function renderGame() {
 
 /**
  * Renders the current screen while preserving inventory scroll positions.
- * @param {{focus?: boolean, animate?: boolean}} [options] Render behavior.
+ * @param {{focus?: boolean, animate?: boolean, animateOffers?: boolean}} [options] Render behavior.
  */
-function render({ focus = false, animate = true } = {}) {
+function render({ focus = false, animate = true, animateOffers = false } = {}) {
   const scrolls = Object.fromEntries(
     [...document.querySelectorAll(".bin")].map((el) => [el.id, el.scrollLeft]),
   );
   hideTooltip();
-  ui.menu ? renderMenu() : renderGame();
+  ui.menu ? renderMenu() : renderGame({ animateOffers });
   if (!animate) app.querySelector(".screen")?.classList.remove("screen");
   else window.scrollTo({ top: 0, behavior: "instant" });
   for (const [id, left] of Object.entries(scrolls)) {
     const bin = document.getElementById(id);
-    if (bin) bin.scrollLeft = left;
+    if (bin) bin.scrollTo({ left, behavior: "instant" });
   }
   if (focus)
     app
@@ -837,6 +909,7 @@ async function doScore() {
             pointsNode.closest(".points")?.classList.add("goal-reached");
             subtitle.textContent = `goal reached: +$${bonusFor(state.round)}!`;
             subtitle.classList.add("bonus-award");
+            celebrateGoal(subtitle);
             sound.play("bonus");
           }
         },
@@ -1006,6 +1079,21 @@ function hideTooltip() {
     .forEach((el) => el.removeAttribute("aria-describedby"));
 }
 
+document.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return;
+  const button = event.target.closest("button");
+  if (!button || button.disabled) return;
+  sound.unlock();
+  sound.play("mousedown");
+});
+
+document.addEventListener("pointerup", (event) => {
+  if (event.button !== 0) return;
+  const button = event.target.closest("button");
+  if (!button || button.disabled) return;
+  sound.play("mouseup");
+});
+
 app.addEventListener("click", async (event) => {
   const el = event.target.closest("[data-action]");
   if (!el || el.disabled) return;
@@ -1071,7 +1159,7 @@ app.addEventListener("click", async (event) => {
       if (enterShop(state)) {
         sound.play("click");
         persist();
-        render({ focus: true });
+        render({ focus: true, animateOffers: true });
       }
       break;
     case "next":
@@ -1142,7 +1230,7 @@ app.addEventListener("click", async (event) => {
       if (rerollShop(state)) {
         sound.play("reroll");
         persist();
-        render();
+        render({ animateOffers: true });
         document
           .querySelector('[data-action="reroll-shop"]')
           ?.focus({ preventScroll: true });

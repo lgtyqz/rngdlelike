@@ -4,6 +4,9 @@ const SOUND_KEY = "rngdlelike.sound.v1";
 // Paths are relative to this module; volume is per cue (0–1).
 export const SOUND_REGISTRY = {
   click: { src: "../assets/sounds/click.wav", volume: 0.8 },
+  mousedown: { src: "../assets/sounds/mousedown.wav", volume: 0.8 },
+  mouseup: { src: "../assets/sounds/mouseup.wav", volume: 0.8 },
+  legendary: { src: "../assets/sounds/legendary.wav", volume: 0.8 },
   start: { src: "../assets/sounds/start.wav", volume: 0.8 },
   coin: { src: "../assets/sounds/coin.wav", volume: 0.8 },
   spin: { src: "../assets/sounds/spin.wav", volume: 0.8 },
@@ -116,7 +119,11 @@ export class GameAudio {
     // Reduced motion / fast scoring may resolve many events in one frame.
     if (now - (this.lastCue.get(name) ?? -Infinity) < 0.045) return;
     this.lastCue.set(name, now);
-    const playbackRate = name === "score" ? 2 ** (this.scorePitch++ / 12) : 1;
+    let playbackRate = 1;
+    if (name === "score") {
+      playbackRate = 2 ** (this.scorePitch / 12);
+      this.scorePitch += 0.3;
+    }
     const generation = this.generation;
     const buffer = await this.load(name);
     if (
@@ -125,7 +132,7 @@ export class GameAudio {
       !this.enabled ||
       document.hidden ||
       context.state === "closed" ||
-      this.voices.size >= 24
+      this.voices.size >= 200
     )
       return;
     try {

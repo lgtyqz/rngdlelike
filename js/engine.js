@@ -1,4 +1,11 @@
-import { ITEMS, TRINKETS, TOOLS, RARITIES, ownItem } from "./items.js";
+import {
+  ITEMS,
+  TRINKETS,
+  TOOLS,
+  RARITIES,
+  ownItem,
+  itemPrice,
+} from "./items.js";
 import { hash, random } from "./random.js";
 export const TOTAL_SPINS = 20;
 /** Returns the point target for a given round. */
@@ -6,9 +13,9 @@ export const goalFor = (round) => 10 + (round - 1) * 40;
 /** Returns the cash bonus awarded for meeting a round's point target. */
 export const bonusFor = (round) => 20 + (round - 1) * 30;
 /** Returns the guaranteed cash allowance awarded after a round. */
-export const allowanceFor = (round) => round * 10;
+export const allowanceFor = (round) => 10 + round * 5;
 /** Returns the current cost to reroll the shop. */
-export const rerollPrice = (state) => 3 + state.rerolls * 2;
+export const rerollPrice = (state) => 3 + state.rerolls * 3;
 
 /**
  * Creates a new game state for a normal, daily, or shared-seed run.
@@ -141,20 +148,46 @@ export function scoreTrinket(item, reels) {
   const add = (indices, points) => {
     if (points > 0) steps.push({ reels: indices, points });
   };
-  const each = (predicate, value) => reels.forEach((digit, index) => {
-    if (predicate(digit)) add([index], typeof value === "function" ? value(digit) : value);
-  });
+  const each = (predicate, value) =>
+    reels.forEach((digit, index) => {
+      if (predicate(digit))
+        add([index], typeof value === "function" ? value(digit) : value);
+    });
   const all = reels.map((_, index) => index);
   switch (effect) {
-    case "even": each((n) => n % 2 === 0, 4); break;
-    case "odd": each((n) => n % 2 === 1, 4); break;
-    case "zero": each((n) => n === 0, 12); break;
-    case "high": each((n) => n >= 5, 5); break;
-    case "low": each((n) => n < 4, 6); break;
-    case "seven": each((n) => n === 7, 25); break;
-    case "prime": each((n) => [2, 3, 5, 7].includes(n), 20); break;
-    case "sum": each(() => true, (n) => n); break;
-    case "star": each(() => true, (n) => n * 15); break;
+    case "even":
+      each((n) => n % 2 === 0, 4);
+      break;
+    case "odd":
+      each((n) => n % 2 === 1, 4);
+      break;
+    case "zero":
+      each((n) => n === 0, 12);
+      break;
+    case "high":
+      each((n) => n >= 5, 5);
+      break;
+    case "low":
+      each((n) => n < 4, 6);
+      break;
+    case "seven":
+      each((n) => n === 7, 25);
+      break;
+    case "prime":
+      each((n) => [2, 3, 5, 7].includes(n), 20);
+      break;
+    case "sum":
+      each(
+        () => true,
+        (n) => n,
+      );
+      break;
+    case "star":
+      each(
+        () => true,
+        (n) => n * 15,
+      );
+      break;
     case "pair":
     case "crown":
       for (let i = 0; i < reels.length; i++) {
@@ -224,11 +257,19 @@ export function scoreTrinket(item, reels) {
       break;
     case "unicorn":
       if (reels.includes(0) && reels.includes(9)) {
-        add(all.filter((i) => reels[i] === 0 || reels[i] === 9), 500);
+        add(
+          all.filter((i) => reels[i] === 0 || reels[i] === 9),
+          500,
+        );
       }
       break;
   }
-  return { id: item.id, points: steps.reduce((sum, step) => sum + step.points, 0), note, steps };
+  return {
+    id: item.id,
+    points: steps.reduce((sum, step) => sum + step.points, 0),
+    note,
+    steps,
+  };
 }
 
 /**
@@ -280,6 +321,20 @@ function choose(pool, rng) {
   );
 }
 
+/** Selects an owned tool using each tool's individual rarity weight. */
+function chooseUpgrade(tools, rng) {
+  const weight = tools.reduce(
+    (sum, owned) => sum + RARITIES[ITEMS[owned.id].rarity].weight,
+    0,
+  );
+  let roll = rng() * weight;
+  return (
+    tools.find(
+      (owned) => (roll -= RARITIES[ITEMS[owned.id].rarity].weight) < 0,
+    ) || tools.at(-1)
+  );
+}
+
 /**
  * Generates the deterministic trinket, tool, and upgrade offers for a shop.
  * @param {object} state Current game state.
@@ -306,24 +361,21 @@ export function generateOffers(state) {
             id: def.id,
             kind: "trinket",
             rarity: def.rarity,
-            price: RARITIES[def.rarity].price,
+            price: itemPrice(def),
             sold: false,
           }
         : { kind: "trinket", empty: true },
     );
   }
-  const upgrade = state.tools[Math.floor(rng() * state.tools.length)];
-  const rarity = choose(
-    Object.keys(RARITIES).map((r) => ({ rarity: r })),
-    rng,
-  ).rarity;
+  const upgrade = chooseUpgrade(state.tools, rng);
+  const upgradeDef = ITEMS[upgrade.id];
   offers.push({
     id: upgrade.id,
     kind: "upgrade",
-    rarity,
-    amount: RARITIES[rarity].power,
+    rarity: upgradeDef.rarity,
+    amount: 1,
     price:
-      Math.ceil(RARITIES[rarity].price * 0.5) +
+      Math.ceil(itemPrice(upgradeDef) * 0.5) +
       (upgrade.maxUses - ITEMS[upgrade.id].maxUses) * 3,
     sold: false,
   });
@@ -337,7 +389,7 @@ export function generateOffers(state) {
           id: def.id,
           kind: "tool",
           rarity: def.rarity,
-          price: RARITIES[def.rarity].price + 5,
+          price: itemPrice(def),
           sold: false,
         }
       : { kind: "tool", empty: true },
@@ -386,7 +438,7 @@ export function buy(state, index) {
   if (offer.kind === "upgrade") {
     const tool = state.tools.find((t) => t.id === offer.id);
     if (!tool) return false;
-    tool.maxUses += offer.amount;
+    tool.maxUses += 1;
     tool.uses = tool.maxUses;
   } else
     state[offer.kind === "tool" ? "tools" : "trinkets"].push(ownItem(offer.id));
@@ -430,5 +482,5 @@ export function shareText(state, url) {
   const heading =
     state.mode === "daily" ? `Daily ${state.date}` : `Seed ${state.seed}`;
   const results = state.history.map((h) => (h.bonus ? "🟩" : "⬜"));
-  return `RNGdlelike · ${heading}\n${state.total.toLocaleString("en-US")} points in ${state.history.length}/20 spins!\n${results.slice(0, 10).join("")}\n${results.slice(10).join("")}\nGoals: ${state.history.filter((h) => h.bonus).length}/20 · Best spin: ${Math.max(0, ...state.history.map((h) => h.points))}\nTrinkets: ${state.trinkets.map((t) => `${ITEMS[t.id].emoji} ${ITEMS[t.id].name}${t.metadata?.power != null ? ` (power ${t.metadata.power})` : ""}`).join(", ")}\nTools: ${state.tools.map((t) => `${ITEMS[t.id].emoji} ${ITEMS[t.id].name} (${t.maxUses}/spin)`).join(", ")}\nThink you can beat my luck? Play the same seed!\n${url}`;
+  return `RNGdlelike · ${heading}\n${state.total.toLocaleString("en-US")} points in ${state.history.length}/20 spins!\n${results.slice(0, 10).join("")}\n${results.slice(10).join("")}\nGoals: ${state.history.filter((h) => h.bonus).length}/20 · Best spin: ${Math.max(0, ...state.history.map((h) => h.points))}\nTrinkets: ${state.trinkets.map((t) => `${ITEMS[t.id].emoji}`).join("")}\nTools: ${state.tools.map((t) => `${ITEMS[t.id].emoji}`).join(", ")}\nThink you can beat my luck? Play the same seed!\n${url}`;
 }

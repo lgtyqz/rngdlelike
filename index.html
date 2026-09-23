@@ -1,20 +1,50 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#ffffff">
-  <meta name="description" content="Your favorite dle, now in your favorite genre. Spin 20 times, collect trinkets, bend your luck, and chase a high score.">
-  <title>RNGdlelike — make your own luck</title>
-  <link rel="icon" href="openmoji-svg-color/1F3B2.svg" type="image/svg+xml">
-  <link rel="preload" href="assets/fonts/lexend-regular.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="stylesheet" href="styles.css">
-  <script type="module" src="js/app.js"></script>
-</head>
-<body>
-  <main id="app"></main>
-  <div id="tooltip" role="tooltip" hidden></div>
-  <dialog id="help"><h2>A little luck. A little strategy.</h2><p>You have 20 spins. Each reel lands on a digit from 0 to 9. Your trinkets turn those digits into points.</p><p>After spinning, select a tool, then a reel to change it. Tools recharge every spin. Hover or focus any item to learn what it does; tap trinkets to inspect them.</p><p>Get points to activate your trinkets. Beat that spin’s goal for a cash bonus, then buy trinkets, tools, or upgrades in the shop. Missing a goal never ends your run.</p><p>Daily runs reset at midnight UTC. The same seed and choices produce the same results. Your run saves automatically in this browser.</p><form method="dialog"><button class="button small">GOT IT!</button></form></dialog>
-  <noscript>This game needs JavaScript enabled to spin the reels.</noscript>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta
+      name="description"
+      content="Your favorite dle, now in your favorite genre. Spin 20 times, collect trinkets, bend your luck, and chase a high score."
+    />
+    <title>RNGdlelike</title>
+    <link rel="icon" href="openmoji-svg-color/1F3B2.svg" type="image/svg+xml" />
+    <link
+      rel="preload"
+      href="assets/fonts/lexend-regular.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <main id="app"></main>
+    <div id="tooltip" role="tooltip" hidden></div>
+    <dialog id="help">
+      <h2>A little luck. A little strategy.</h2>
+      <p>
+        You have 20 spins. Each reel lands on a digit from 0 to 9. Your trinkets
+        turn those digits into points.
+      </p>
+      <p>
+        After spinning, select a tool, then a reel to change it. Tools recharge
+        every spin. Hover or focus any item to learn what it does; tap trinkets
+        to inspect them.
+      </p>
+      <p>
+        Get points to activate your trinkets. Beat that spin's goal for a cash
+        bonus, then buy trinkets, tools, or upgrades in the shop. Missing a goal
+        never ends your run.
+      </p>
+      <p>
+        Daily runs reset at midnight UTC. The same seed and choices produce the
+        same results. Your run saves automatically in this browser.
+      </p>
+      <form method="dialog"><button class="button small">GOT IT!</button></form>
+    </dialog>
+    <noscript>This game needs JavaScript enabled to spin the reels.</noscript>
+  </body>
 </html>
