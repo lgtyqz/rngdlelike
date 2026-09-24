@@ -45,6 +45,13 @@ musicVolume.addEventListener("input", () =>
   music.setVolume(musicVolume.value / 100),
 );
 const app = document.querySelector("#app");
+// Delegation also covers images created when the game or shop rerenders.
+for (const type of ["dragstart", "contextmenu"]) {
+  document.addEventListener(type, (event) => {
+    if (event.target instanceof Element && event.target.closest("img"))
+      event.preventDefault();
+  });
+}
 const tooltip = document.querySelector("#tooltip");
 const help = document.querySelector("#help");
 const credits = document.querySelector("#credits");

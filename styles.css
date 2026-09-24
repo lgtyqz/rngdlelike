@@ -74,6 +74,10 @@ h2 {
 }
 img {
   display: block;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 button {
   -webkit-tap-highlight-color: transparent;
