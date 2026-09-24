@@ -7,6 +7,8 @@ import {
 } from "./items.js";
 import {
   createRun,
+  chooseQubit,
+  reelLabel,
   spin,
   useTool,
   settleSpin,
@@ -20,7 +22,7 @@ import {
   rerollPrice,
   shareText,
 } from "./engine.js";
-import { dailySeed, utcDate } from "./random.js";
+import { dailySeed, utcDate, parseSeed } from "./random.js";
 
 import { GameAudio } from "./audio.js";
 import { animateCount } from "./animation.js";
@@ -29,7 +31,8 @@ const sound = new GameAudio();
 const app = document.querySelector("#app");
 const tooltip = document.querySelector("#tooltip");
 const help = document.querySelector("#help");
-const SAVE_KEY = "rngdlelike.run.v1";
+const credits = document.querySelector("#credits");
+const SAVE_KEY = "rngdlelike.run.v2";
 const COLORS = [
   "#e34058",
   "#e38140",
@@ -42,6 +45,7 @@ const COLORS = [
   "#d040e3",
   "#e3409f",
 ];
+const DEFAULT_SLOT_COLOR = "#8c8c8c";
 const CONFETTI_ICONS = [
   "openmoji-svg-color/1F389.svg",
   "openmoji-svg-color/1F38A.svg",
@@ -63,6 +67,7 @@ let state = null,
   scoreWait;
 let ui = {
   menu: true,
+  seedInput: new URLSearchParams(location.search).get("seed") ?? "",
   busy: false,
   selected: null,
   source: null,
@@ -72,6 +77,7 @@ let ui = {
   displayPoints: 0,
   displayTotal: 0,
   displayBank: 0,
+  spinningLocks: null,
 };
 
 /** Escapes a value for safe interpolation into generated HTML. */
@@ -83,6 +89,31 @@ const esc = (value) =>
         char
       ],
   );
+
+const REEL_ICONS = {
+  bomb: "openmoji-svg-color/1F4A3.svg",
+  qubit: "openmoji-svg-color/1F531.svg",
+  lock: "openmoji-svg-color/1F512.svg",
+};
+const reelIcon = (name, className) =>
+  '<img class="' + className + '" src="' + REEL_ICONS[name] + '" alt="">';
+const isBomb = (value) =>
+  typeof value === "string" && value.startsWith("bomb:");
+const isReelLocked = (index) =>
+  state.nextLocks[index] != null ||
+  state.locks[index] != null ||
+  ui.spinningLocks?.[index] != null;
+const reelFace = (value) =>
+  value === "qubit" ? reelIcon("qubit", "reel-symbol") : esc(reelLabel(value));
+const reelDecorations = (value, index) =>
+  (isBomb(value) ? reelIcon("bomb", "reel-bomb-icon") : "") +
+  (isReelLocked(index) ? reelIcon("lock", "reel-lock-icon") : "");
+const poolSlotFace = (slot) =>
+  typeof slot === "object"
+    ? reelIcon("bomb", "reel-pool-icon") + slot.count
+    : slot === "qubit"
+      ? reelIcon("qubit", "reel-pool-icon")
+      : esc(slot);
 
 /** Formats a score or cash value for compact display. */
 const number = (value) =>
@@ -146,7 +177,7 @@ function readSave() {
     const data = JSON.parse(localStorage.getItem(SAVE_KEY));
     if (
       !data ||
-      data.version !== 1 ||
+      data.version !== 2 ||
       !["normal", "daily"].includes(data.mode) ||
       !["ready", "editing", "scored", "shop", "finished"].includes(data.phase)
     )
@@ -167,7 +198,14 @@ function readSave() {
     if (
       !Array.isArray(data.reels) ||
       data.reels.length !== 6 ||
-      !data.reels.every((n) => Number.isInteger(n) && n >= 0 && n <= 9)
+      !data.reels.every(
+        (n) =>
+          n === null ||
+          (Number.isInteger(n) && n >= 0 && n <= 9) ||
+          ["W", "qubit", "π", "e", "√2", "bomb:1", "bomb:2", "bomb:3"].includes(
+            n,
+          ),
+      )
     )
       return null;
     if (
@@ -194,7 +232,7 @@ function readSave() {
           t.maxUses > 0 &&
           Number.isInteger(t.uses) &&
           t.uses >= 0 &&
-          t.uses <= t.maxUses,
+          Number.isFinite(t.uses),
       )
     )
       return null;
@@ -215,6 +253,33 @@ function readSave() {
       !Array.isArray(data.history) ||
       !Array.isArray(data.events) ||
       !data.events.every((e) => ITEMS[e.id] && Number.isFinite(e.points))
+    )
+      return null;
+    if (
+      !Array.isArray(data.reelPools) ||
+      data.reelPools.length !== 6 ||
+      !data.reelPools.every(
+        (pool) =>
+          Array.isArray(pool) &&
+          pool.every(
+            (slot) =>
+              (Number.isInteger(slot) && slot >= 0 && slot <= 9) ||
+              ["W", "qubit", "π", "e", "√2"].includes(slot) ||
+              (slot?.type === "bomb" &&
+                Number.isInteger(slot.count) &&
+                slot.count >= 1 &&
+                slot.count <= 3),
+          ),
+      )
+    )
+      return null;
+    if (
+      ![data.positions, data.qubits, data.locks, data.nextLocks].every(
+        (a) => Array.isArray(a) && a.length === 6,
+      ) ||
+      !Array.isArray(data.pendingEvents) ||
+      !Number.isInteger(data.effectRolls) ||
+      !Number.isInteger(data.legendaryShops)
     )
       return null;
     if (data.mode === "daily" && !validDate(data.date)) return null;
@@ -295,25 +360,42 @@ function renderMenu() {
     })
     .toUpperCase();
   const params = new URLSearchParams(location.search);
-  const challenge =
-    validDate(params.get("daily")) ||
-    /^\d{1,10}$/.test(params.get("seed") || "");
+  const challenge = validDate(params.get("daily"));
   app.innerHTML = `
     <section class="screen menu">
       ${brand()}
       <p class="tagline">your favorite dle, now in your favorite genre</p>
+      <p class="author">by LGTYQZ</p>
       <p class="intro">
-        Game’s simple: Spin 20 times, get as many points as you can.
+        Game's simple: Spin 20 times, get as many points as you can.
       </p>
-      <h2 class="ready">READY?</h2>
       <div class="menu-actions">
         ${button("play", "PLAY!", "play")}
+        ${
+          saved && saved.phase !== "finished"
+            ? `
+                <button class="text-button resume" data-action="resume">
+                  Continue your ${saved.mode === "daily" ? "daily " : ""}run: spin ${saved.round}/20 →
+                </button>
+            `
+            : ""
+        }
         <div>
           ${button("daily", "PLAY DAILY", "daily")}
           <p class="daily-date">${displayDate}</p>
-          <p class="daily-zone">new luck every day @ midnight UTC</p>
+          <p class="daily-zone">new run every day @ midnight UTC</p>
         </div>
       </div>
+      <form class="seed-form" id="seed-form">
+        <label for="seed-input">Play a seed</label>
+        <div class="seed-controls">
+          <input id="seed-input" name="seed" type="text" inputmode="numeric"
+            autocomplete="off" required value="${esc(ui.seedInput)}"
+            placeholder="Enter seed" aria-describedby="seed-help">
+          <button class="button" type="submit">PLAY SEED</button>
+        </div>
+        <p id="seed-help">A whole number from 0 to 4294967295.</p>
+      </form>
       ${
         challenge
           ? `
@@ -325,28 +407,10 @@ function renderMenu() {
           `
           : ""
       }
-      ${
-        saved && saved.phase !== "finished"
-          ? `
-            <p style="margin-top:18px">
-              <button class="text-button resume" data-action="resume">
-                Continue your ${saved.mode === "daily" ? "daily " : ""}run: spin ${saved.round}/20 →
-              </button>
-            </p>
-          `
-          : ""
-      }
       <footer class="menu-footer">
         ${soundButton()}
           <button class="text-button" data-action="help">How to play</button>
-        <a
-          class="text-button"
-          href="https://openmoji.org/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Art by OpenMoji
-        </a>
+        <button class="text-button" data-action="credits">Credits</button>
       </footer>
     </section>
   `;
@@ -362,7 +426,7 @@ function stats() {
   const bonus =
     current === "scored"
       ? state.points >= goalFor(state.round)
-        ? `made the goal: +$${bonusFor(state.round)}!`
+        ? `made the goal: +$${state.history.at(-1)?.bonus ?? bonusFor(state.round)}!`
         : "no bonus this spin — keep going!"
       : `reach the goal for a bonus $${bonusFor(state.round)}!`;
   return `
@@ -411,7 +475,7 @@ function inventory() {
   const sections = ["trinkets", "tools"]
     .map((kind) => {
       const items = state[kind]
-        .map((item) => {
+        .map((item, index) => {
           const def = ITEMS[item.id],
             isTool = kind === "tools",
             editing = phase() === "editing";
@@ -428,6 +492,7 @@ function inventory() {
             <button
               class="item ${selectedClass} ${exhaustedClass}"
               data-item="${item.id}"
+              data-inventory-index="${index}"
               data-action="${isTool ? "tool" : "inspect"}"
               aria-label="${esc(def.name)}. ${esc(itemDescription(item))}${usesLabel}"
               ${pressedAttribute}
@@ -478,16 +543,23 @@ function reels() {
       ${state.reels
         .map(
           (digit, index) => `
+            <div class="reel-shell">
             <button
-              class="reel ${ui.selected ? "targetable" : ""} ${ui.source === index ? "source" : ""}"
+              class="reel ${ui.selected ? "targetable" : ""} ${ui.source === index ? "source" : ""} ${isBomb(digit) ? "reel-bomb" : ""} ${isReelLocked(index) ? "reel-locked" : ""}"
               data-action="reel"
               data-index="${index}"
-              style="--digit-color:${COLORS[digit]}"
-              aria-label="Reel ${index + 1}: ${digit}${ui.selected ? ", apply selected tool" : ""}"
-              ${!ui.selected || ui.busy ? "disabled" : ""}
+              style="--digit-color:${COLORS[digit == null ? -1 : Number(reelLabel(digit))] ?? DEFAULT_SLOT_COLOR}"
+              aria-label="Reel ${index + 1}: ${reelLabel(digit)}${ui.selected ? ", apply selected tool" : ""}"
+              ${(!ui.selected && !state.qubits[index]) || phase() !== "editing" || ui.busy ? "disabled" : ""}
             >
-              <span class="digit">${digit}</span>
+              ${reelDecorations(digit, index)}
+              <span class="digit">${reelFace(digit)}</span>
+              ${state.qubits[index] ? '<small class="reel-detail">0 ↔ 1</small>' : ""}
             </button>
+            <button class="reel-inspect" data-pool="${index}" aria-label="Inspect reel ${index + 1} pool">
+              <img src="assets/reel-magnifier.svg" alt="">
+            </button>
+            </div>
           `,
         )
         .join("")}
@@ -519,12 +591,12 @@ function offers(animateSpawn = false) {
       const affordabilityClass = state.bank < offer.price ? "unaffordable" : "";
       const spawnClass =
         animateSpawn && offer.rarity === "legendary" ? "legendary-spawn" : "";
-      if (offer.rarity === "legendary") {
+      if (offer.rarity === "legendary" && animateSpawn) {
         sound.play("legendary");
       }
       const upgradeLabel =
         offer.kind === "upgrade"
-          ? ` upgrade, plus ${offer.amount} uses per spin`
+          ? ` upgrade, plus ${offer.amount} uses${def.limitedUse ? " for this run" : " per spin"}`
           : "";
       const offerLabel = `${offer.sold ? "Sold" : "Buy"} ${esc(def.name)}${upgradeLabel}, ${RARITIES[offer.rarity].label}, $${offer.price}`;
       return `
@@ -572,14 +644,20 @@ function offers(animateSpawn = false) {
 
 /** Returns one scoring-event row for the animated score log. */
 function logRow(event, pending = false) {
+  const isCashBonus = event.id === "w";
+  const isMessageEvent = Boolean(event.message);
   return `
-    <div class="log-row ${event.points ? "" : "missed"}">
+    <div class="log-row ${event.points || event.multiplier > 1 || isCashBonus || isMessageEvent ? "" : "missed"}">
       <img src="${iconPath(event.id)}" alt="" width="52" height="52">
       <div>
         <span class="log-name">
           ${esc(ITEMS[event.id].name.toUpperCase())}:
         </span>
-        +<span class="log-points">${number(pending ? 0 : event.points)}</span>
+        ${
+          isMessageEvent
+            ? `<span class="log-message">${esc(event.message)}</span>`
+            : `+${isCashBonus ? "$" : ""}<span class="log-points">${number(pending ? 0 : isCashBonus ? event.cash : event.points)}</span>`
+        }
         ${event.note ? `<small class="log-note" ${pending ? "hidden" : ""}>${esc(event.note)}</small>` : ""}
       </div>
     </div>
@@ -640,7 +718,13 @@ function renderGame({ animateOffers = false } = {}) {
               ? ui.source == null
                 ? "choose the first reel"
                 : "choose a different target reel"
-              : "choose a reel"
+              : def.target === "trinket"
+                ? def.id === "camera"
+                  ? "choose a trinket with an activated ability"
+                  : "choose a trinket"
+                : def.target === "tool"
+                  ? "choose another tool ($30)"
+                  : "choose a reel"
           }
           <button data-action="cancel-tool">cancel</button>
         `;
@@ -657,9 +741,7 @@ function renderGame({ animateOffers = false } = {}) {
     }
   }
   const mode =
-    state.mode === "daily"
-      ? `DAILY · ${state.date} · UTC`
-      : `SEED ${state.seed}`;
+    state.mode === "daily" ? `DAILY - ${state.date} UTC` : `SEED ${state.seed}`;
   app.innerHTML = `
     <section class="screen game">
       <header class="game-header">
@@ -673,7 +755,7 @@ function renderGame({ animateOffers = false } = {}) {
           current === "finished"
             ? `
               <p class="run-summary">
-                ${state.history.filter((h) => h.bonus).length} goals reached ·
+                ${state.history.filter((h) => h.bonus).length} goals reached |
                 best spin: ${number(Math.max(...state.history.map((h) => h.points)))}
               </p>
             `
@@ -752,11 +834,19 @@ function start(mode, seed, date = null) {
  * @returns {Promise<void>}
  */
 async function animateReel(node, finalDigit, index, quick = false) {
+  const finalValue = finalDigit;
+  finalDigit = reelLabel(finalValue);
+  const finalFace = reelFace(finalValue);
+  const decorations = reelDecorations(finalValue, index);
   if (reducedMotion.matches) {
     node.innerHTML = `
-      <span class="digit">${finalDigit}</span>
+      ${decorations}
+      <span class="digit">${finalFace}</span>
     `;
-    node.style.setProperty("--digit-color", COLORS[finalDigit]);
+    node.style.setProperty(
+      "--digit-color",
+      COLORS[finalDigit] ?? DEFAULT_SLOT_COLOR,
+    );
     return;
   }
   const height = node.clientHeight,
@@ -765,11 +855,12 @@ async function animateReel(node, finalDigit, index, quick = false) {
     i === count ? finalDigit : (i + index * 3) % 10,
   );
   node.innerHTML = `
+    ${isReelLocked(index) ? reelIcon("lock", "reel-lock-icon") : ""}
     <div class="reel-strip">
-      ${digits.map((n) => `<span>${n}</span>`).join("")}
+      ${digits.map((n, i) => `<span>${i === count ? finalFace : n}</span>`).join("")}
     </div>
   `;
-  const strip = node.firstElementChild;
+  const strip = node.querySelector(".reel-strip");
   const duration = quick ? 430 : 1000 + index * 150;
   let colorFrame,
     visibleIndex = 0;
@@ -789,16 +880,20 @@ async function animateReel(node, finalDigit, index, quick = false) {
       visibleIndex = nextIndex;
       sound.play("tick");
     }
-    node.style.setProperty("--digit-color", COLORS[digits[nextIndex]]);
+    node.style.setProperty(
+      "--digit-color",
+      COLORS[digits[nextIndex]] ?? "#40b8e3",
+    );
     colorFrame = requestAnimationFrame(colorTick);
   }
   colorFrame = requestAnimationFrame(colorTick);
   await animation.finished;
   cancelAnimationFrame(colorFrame);
   node.innerHTML = `
-    <span class="digit">${finalDigit}</span>
+    ${decorations}
+    <span class="digit">${finalFace}</span>
   `;
-  node.style.setProperty("--digit-color", COLORS[finalDigit]);
+  node.style.setProperty("--digit-color", COLORS[finalDigit] ?? "#40b8e3");
   const landed = new Promise((resolve) =>
     node.addEventListener("animationend", resolve, { once: true }),
   );
@@ -807,20 +902,55 @@ async function animateReel(node, finalDigit, index, quick = false) {
   await landed;
 }
 
+/** Displays bomb, sight-counter, and cash events over the reels that caused them. */
+function showReelNotifications() {
+  const show = (index, message, kind) => {
+    const shell = document.querySelectorAll(".reel-shell")[index];
+    if (!shell) return;
+    const toast = document.createElement("div");
+    toast.className = `reel-toast ${kind}-toast`;
+    toast.setAttribute("role", "status");
+    toast.textContent = message;
+    if (toast.textContent.startsWith("Bomb exploded")) {
+      sound.play("kaboom");
+    }
+    shell.append(toast);
+    setTimeout(() => toast.remove(), reducedMotion.matches ? 2300 : 1900);
+  };
+  for (const event of state.bombEvents ?? [])
+    show(event.reels[0], event.message, "bomb");
+  for (const event of state.seenEvents ?? []) {
+    show(
+      event.index,
+      `${ITEMS[event.id].name}${event.threshold != null ? ` +${event.amount} \n ${event.count}/${event.threshold}` : ""}${event.note ? ` \n ${event.note}` : ""}`,
+      "seen",
+    );
+  }
+}
+
 /** Spins the game state and animates all six reels. */
 async function doSpin() {
-  if (ui.busy || !spin(state)) return;
+  if (ui.busy) return;
+  ui.spinningLocks = [...state.locks];
+  if (!spin(state)) {
+    ui.spinningLocks = null;
+    return;
+  }
   ui.busy = true;
   sound.play("spin");
   persist();
   render({ animate: false });
   await Promise.all(
     [...document.querySelectorAll(".reel")].map((node, i) =>
-      animateReel(node, state.reels[i], i),
+      ui.spinningLocks[i] == null
+        ? animateReel(node, state.reels[i], i)
+        : Promise.resolve(),
     ),
   );
+  ui.spinningLocks = null;
   ui.busy = false;
   render({ focus: true, animate: false });
+  showReelNotifications();
 }
 
 /**
@@ -878,12 +1008,33 @@ async function doScore() {
     const ledger = row.querySelector(".log-points");
     row.classList.add("scoring-active");
     log.scrollTop = log.scrollHeight;
+    if (event.id === "w" || event.message) {
+      for (const index of event.reels ?? [])
+        if (!reducedMotion.matches)
+          reelNodes[index].classList.add("scoring-hit");
+      if (event.id === "w") {
+        row.querySelector(".log-points").textContent = number(event.cash);
+        if (event.cash)
+          subtitle.textContent = `goal bonus: +$${number(event.bonusTotal)}!`;
+      }
+      await waitForScore(350);
+      for (const index of event.reels ?? [])
+        reelNodes[index].classList.remove("scoring-hit");
+      row.querySelector(".log-note")?.removeAttribute("hidden");
+      row.classList.remove("scoring-active");
+      continue;
+    }
     let subtotal = 0;
     // Older saves can still display aggregate events without contribution data.
     const steps =
       event.steps ??
       (event.points ? [{ reels: [], points: event.points }] : []);
     for (const step of steps) {
+      const note = row.querySelector(".log-note");
+      if (step.note && note) {
+        note.textContent = step.note;
+        note.removeAttribute("hidden");
+      }
       if (!reducedMotion.matches) {
         for (const index of step.reels)
           reelNodes[index].classList.add("scoring-hit");
@@ -920,7 +1071,11 @@ async function doScore() {
       // Leave a visible gap so overlapping pairs can pulse again.
       await waitForScore(60);
     }
-    row.querySelector(".log-note")?.removeAttribute("hidden");
+    const note = row.querySelector(".log-note");
+    if (note) {
+      note.textContent = event.note;
+      note.removeAttribute("hidden");
+    }
     log.scrollTop = log.scrollHeight;
     row.classList.remove("scoring-active");
     await waitForScore(event.points ? 180 : 220);
@@ -928,9 +1083,8 @@ async function doScore() {
   const bonus = state.history.at(-1).bonus;
   subtitle.textContent = bonus
     ? `made the goal: +$${bonus}!`
-    : "no bonus this spin — keep going!";
+    : "no bonus this spin, keep going!";
   if (bonus) subtitle.classList.add("bonus-award");
-  sound.play("settle");
   const bankNode = document.querySelector("#bank");
   bankNode.classList.add("bank-bump");
   await animateCount({
@@ -956,12 +1110,20 @@ async function doScore() {
  * @param {number} index Target reel index.
  */
 async function targetReel(index) {
-  if (!ui.selected || ui.busy) return;
+  if (ui.busy) return;
+  if (!ui.selected) {
+    if (chooseQubit(state, index)) {
+      persist();
+      render({ animate: false });
+    }
+    return;
+  }
+  if (["trinket", "tool"].includes(ITEMS[ui.selected].target)) return;
   const id = ui.selected,
     def = ITEMS[id];
   if (["swap", "copy"].includes(def.effect) && ui.source == null) {
     ui.source = index;
-    sound.play("click");
+
     render({ animate: false });
     document.querySelector(`[data-index="${index}"]`)?.focus();
     return;
@@ -971,21 +1133,38 @@ async function targetReel(index) {
     sound.play("error");
     return;
   }
-  sound.play("tool");
   ui.selected = null;
   ui.source = null;
   ui.busy = true;
   persist();
   render({ animate: false });
   const nodes = [...document.querySelectorAll(".reel")];
+  const rerolled =
+    def.effect === "bigreroll"
+      ? new Set([(index + 5) % 6, index, (index + 1) % 6])
+      : null;
   await Promise.all(
     nodes.map(async (node, i) => {
-      if (old[i] !== state.reels[i] || i === index)
+      if (rerolled?.has(i) || old[i] !== state.reels[i] || i === index)
         await animateReel(node, state.reels[i], i, true);
     }),
   );
   ui.busy = false;
   render({ focus: true, animate: false });
+  showReelNotifications();
+}
+
+function applyInventoryTool(id) {
+  if (!useTool(state, ui.selected, id)) {
+    sound.play("error");
+    return;
+  }
+  if (ui.selected === "camera") sound.play("camera");
+  ui.selected = null;
+  ui.source = null;
+  persist();
+  render({ animate: false });
+  showReelNotifications();
 }
 
 /** Copies the run summary and challenge URL, with a dialog fallback. */
@@ -1031,29 +1210,66 @@ async function share() {
  * @param {HTMLElement} element Inventory item or shop offer element.
  */
 function inspect(element) {
+  if (element.hasAttribute("data-pool")) {
+    const index = Number(element.dataset.pool);
+    const pool = state.reelPools[index];
+    hideTooltip();
+    tooltip.className = "pool-tooltip";
+    tooltip.innerHTML = `
+      <span class="sr-only">Reel ${index + 1} pool, ${pool.length} slots</span>
+      <div class="pool-grid">${pool
+        .map((slot) => {
+          const label =
+            typeof slot === "object"
+              ? `Bomb: ${slot.count}`
+              : slot === "qubit"
+                ? "Superposition: 0 or 1"
+                : String(slot);
+          return `<span class="pool-slot" style="--digit-color:${COLORS[typeof slot === "number" ? slot : -1] ?? DEFAULT_SLOT_COLOR}" role="img" aria-label="${esc(label)}"><span aria-hidden="true">${poolSlotFace(slot)}</span></span>`;
+        })
+        .join("")}</div>
+      ${pool.length ? "" : '<span class="pool-note">Empty reel pool</span>'}
+      ${state.nextLocks[index] != null ? `<span class="pool-note">Locked at ${esc(state.nextLocks[index])} next spin</span>` : ""}
+    `;
+    positionTooltip(element.closest(".reel-shell"), element);
+    return;
+  }
   const id = element.dataset.item,
     def = ITEMS[id];
   if (!def) return;
   const owned =
-    [...state.trinkets, ...state.tools].find((t) => t.id === id) || ownItem(id);
+    (element.dataset.inventoryIndex != null
+      ? state[ITEMS[id].kind === "trinket" ? "trinkets" : "tools"][
+          Number(element.dataset.inventoryIndex)
+        ]
+      : null) ||
+    [...state.trinkets, ...state.tools].find((t) => t.id === id) ||
+    ownItem(id);
   const offer =
     element.dataset.offer != null
       ? state.offers[Number(element.dataset.offer)]
       : null;
   const description =
     offer?.kind === "upgrade"
-      ? `Permanently add ${offer.amount} uses per spin to ${def.name}. ${owned.maxUses} → ${owned.maxUses + offer.amount} uses per spin.`
+      ? def.limitedUse
+        ? `Upgrade ${def.name} for this run.\n${owned.uses} → ${owned.uses + offer.amount} uses remaining.`
+        : `Permanently upgrade ${def.name}.\n${owned.maxUses} → ${owned.maxUses + offer.amount} uses per spin.`
       : itemDescription(owned);
   const rarity = offer?.rarity || def.rarity;
+  hideTooltip();
   tooltip.innerHTML = `
     <strong>${esc(def.name)}</strong>
     <span class="rarity ${rarity}">
-      ${RARITIES[rarity].label}${offer?.kind === "upgrade" ? " · Tool upgrade" : ""}
+      ${RARITIES[rarity].label}${offer?.kind === "upgrade" ? " \n Tool upgrade" : ""}
     </span>
-    ${esc(description)}
+    <span class="tooltip-description">${esc(description)}</span>
   `;
+  positionTooltip(element);
+}
+
+function positionTooltip(element, trigger = element) {
   tooltip.hidden = false;
-  element.setAttribute("aria-describedby", "tooltip");
+  trigger.setAttribute("aria-describedby", "tooltip");
   const rect = element.getBoundingClientRect(),
     tip = tooltip.getBoundingClientRect();
   const left = Math.max(
@@ -1073,10 +1289,38 @@ function inspect(element) {
 
 /** Hides the item tooltip and removes its accessibility references. */
 function hideTooltip() {
+  clearTimeout(poolHideTimer);
   tooltip.hidden = true;
+  tooltip.className = "";
   document
     .querySelectorAll('[aria-describedby="tooltip"]')
     .forEach((el) => el.removeAttribute("aria-describedby"));
+}
+
+function closeInfoDialog(dialog) {
+  if (!dialog.open || dialog.classList.contains("closing")) return;
+  if (reducedMotion.matches) {
+    dialog.close();
+    return;
+  }
+  dialog.classList.add("closing");
+  setTimeout(() => {
+    dialog.close();
+    dialog.classList.remove("closing");
+  }, 180);
+}
+
+for (const dialog of [help, credits]) {
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeInfoDialog(dialog);
+  });
+  dialog
+    .querySelector('form[method="dialog"]')
+    .addEventListener("submit", (event) => {
+      event.preventDefault();
+      closeInfoDialog(dialog);
+    });
 }
 
 document.addEventListener("pointerdown", (event) => {
@@ -1092,6 +1336,28 @@ document.addEventListener("pointerup", (event) => {
   const button = event.target.closest("button");
   if (!button || button.disabled) return;
   sound.play("mouseup");
+});
+
+app.addEventListener("input", (event) => {
+  if (event.target.id !== "seed-input") return;
+  ui.seedInput = event.target.value;
+  event.target.setCustomValidity("");
+});
+
+app.addEventListener("submit", (event) => {
+  if (event.target.id !== "seed-form") return;
+  event.preventDefault();
+  if (ui.busy) return;
+  const input = event.target.elements.seed;
+  ui.seedInput = input.value;
+  const seed = parseSeed(input.value);
+  if (seed === null) {
+    input.setCustomValidity("Enter a whole number from 0 to 4294967295.");
+    input.reportValidity();
+    return;
+  }
+  sound.unlock();
+  start("normal", seed);
 });
 
 app.addEventListener("click", async (event) => {
@@ -1110,10 +1376,9 @@ app.addEventListener("click", async (event) => {
     scoreWait?.();
     return;
   }
-  if (action === "help") {
+  if (action === "help" || action === "credits") {
     hideTooltip();
-    sound.play("click");
-    help.showModal();
+    (action === "help" ? help : credits).showModal();
     return;
   }
   if (ui.busy) return;
@@ -1130,11 +1395,9 @@ app.addEventListener("click", async (event) => {
       const params = new URLSearchParams(location.search),
         date = params.get("daily");
       if (validDate(date)) start("daily", dailySeed(date, calendar), date);
-      else start("normal", Number(params.get("seed")) >>> 0);
       break;
     }
     case "resume":
-      sound.play("click");
       state = structuredClone(saved);
       ui.menu = false;
       ui.phase = null;
@@ -1143,7 +1406,6 @@ app.addEventListener("click", async (event) => {
       render({ focus: true });
       break;
     case "menu":
-      sound.play("click");
       ui.menu = true;
       ui.selected = null;
       ui.source = null;
@@ -1157,19 +1419,21 @@ app.addEventListener("click", async (event) => {
       break;
     case "shop":
       if (enterShop(state)) {
-        sound.play("click");
         persist();
         render({ focus: true, animateOffers: true });
       }
       break;
     case "next":
       if (nextRound(state)) {
-        sound.play("click");
         persist();
         render({ focus: true });
       }
       break;
     case "tool": {
+      if (ui.selected === "atm") {
+        applyInventoryTool(el.dataset.item);
+        break;
+      }
       const tool = state.tools.find((t) => t.id === el.dataset.item);
       if (state.phase !== "editing") {
         inspect(el);
@@ -1180,7 +1444,24 @@ app.addEventListener("click", async (event) => {
         inspect(el);
         break;
       }
-      sound.play("click");
+      if (ITEMS[tool.id].target === "all") {
+        if (useTool(state, tool.id, null)) {
+          ui.selected = null;
+          ui.source = null;
+          ui.busy = true;
+          persist();
+          render({ animate: false });
+          await Promise.all(
+            [...document.querySelectorAll(".reel")].map((node, i) =>
+              animateReel(node, state.reels[i], i, true),
+            ),
+          );
+          ui.busy = false;
+          render({ focus: true, animate: false });
+          showReelNotifications();
+        }
+        break;
+      }
       ui.selected = ui.selected === tool.id ? null : tool.id;
       ui.source = null;
       render({ animate: false });
@@ -1190,7 +1471,6 @@ app.addEventListener("click", async (event) => {
       break;
     }
     case "cancel-tool":
-      sound.play("click");
       ui.selected = null;
       ui.source = null;
       render({ focus: true, animate: false });
@@ -1199,6 +1479,10 @@ app.addEventListener("click", async (event) => {
       await targetReel(Number(el.dataset.index));
       break;
     case "inspect":
+      if (ui.selected && ITEMS[ui.selected].target === "trinket") {
+        applyInventoryTool(Number(el.dataset.inventoryIndex));
+        break;
+      }
       inspect(el);
       break;
     case "buy": {
@@ -1241,21 +1525,33 @@ app.addEventListener("click", async (event) => {
       break;
   }
 });
+let poolHideTimer;
+app.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-pool]");
+  if (trigger) inspect(trigger);
+});
 app.addEventListener("pointerover", (event) => {
-  const item = event.target.closest("[data-item]");
+  const item = event.target.closest("[data-item], [data-pool]");
   if (item && !item.contains(event.relatedTarget)) inspect(item);
 });
 app.addEventListener("pointerout", (event) => {
-  const item = event.target.closest("[data-item]");
-  if (item && !item.contains(event.relatedTarget)) hideTooltip();
+  const item = event.target.closest("[data-item], [data-pool]");
+  if (item && !item.contains(event.relatedTarget)) {
+    if (item.hasAttribute("data-pool")) {
+      poolHideTimer = setTimeout(hideTooltip, 150);
+    } else hideTooltip();
+  }
 });
+tooltip.addEventListener("pointerenter", () => clearTimeout(poolHideTimer));
+tooltip.addEventListener("pointerleave", hideTooltip);
 app.addEventListener("focusin", (event) => {
-  const item = event.target.closest("[data-item]");
+  const item = event.target.closest("[data-item], [data-pool]");
   if (item) inspect(item);
 });
 app.addEventListener("focusout", hideTooltip);
 document.addEventListener("pointerdown", (event) => {
-  if (!event.target.closest("[data-item]")) hideTooltip();
+  if (!event.target.closest("[data-item], [data-pool], #tooltip"))
+    hideTooltip();
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
@@ -1273,7 +1569,13 @@ document.addEventListener("keydown", (event) => {
   }
 });
 window.addEventListener("resize", hideTooltip);
-document.addEventListener("scroll", hideTooltip, true);
+document.addEventListener(
+  "scroll",
+  (event) => {
+    if (!tooltip.contains(event.target)) hideTooltip();
+  },
+  true,
+);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) sound.stop();
   if (!document.hidden && ui.menu) render({ animate: false });

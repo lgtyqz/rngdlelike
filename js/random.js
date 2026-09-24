@@ -10,6 +10,13 @@ export function hash(text) {
   return h >>> 0;
 }
 
+/** Parses a player-entered seed without silently wrapping out-of-range values. */
+export function parseSeed(value) {
+  if (typeof value !== "string" || !/^\d+$/.test(value.trim())) return null;
+  const seed = Number(value.trim());
+  return Number.isInteger(seed) && seed <= 0xffffffff ? seed : null;
+}
+
 /**
  * Creates a deterministic pseudorandom-number generator from a seed.
  * @param {number} seed Initial unsigned seed.

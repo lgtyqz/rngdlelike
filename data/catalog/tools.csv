@@ -1,0 +1,25 @@
+ID,Tool Name,Emoji,Text,Initial Uses,Rarity,Limited Use
+reroll,Reroll One,counterclockwise arrows,Select a reel to roll a new random number.,3,Common,
+increment,Increment,plus,Add 1 to a reel (9 becomes 0),1,Common,
+decrement,Decrement,minus,Subtract 1 from a reel (0 becomes 9),1,Common,
+flip,Flip,clockwise vertical arrows,Replace a digit with 9 minus that digit.,1,Common,
+swap,Swap,shuffle,Pick two different digits to switch.,2,Uncommon,
+double,Double,bangbang,"Double a digit, keeping only the last digit.",2,Uncommon,
+copy,Copycat,cat,"Select a reel to copy, then a different reel to copy onto.",1,Rare,
+bigreroll,Reroll Three,cyclone,"Select a reel to reroll, then reroll the reels next to it.",2,Uncommon,
+megareroll,Reroll All,spiral eyes,Respin all reels.,2,Rare,
+seven-tool,Time for Seven,seven o clock,Set any reel to 7.,1,Rare,
+eight-tool,Time for Eight,eight o clock,Set any reel to 8.,1,Rare,
+echo,Speak Facts,speaking head,Copy a reel's digit to both its neighbors.,1,Legendary,
+bomb,Bomb,bomb,"Permanently replace a reel slot with a Bomb (starting at 3). Landing on a bomb counts it down, and bombs exploding removes the reel slot altogether and gives you +$100!",3,Rare,TRUE
+w,W,w,Permanently replace a reel slot with a W. Landing on a W gives you double the cash bonus for the round.,2,Rare,TRUE
+camera,Camera,camera with flash,Activate a trinket's ablity.,1,Legendary,
+soap,Soap,soap,"Remove a slot from a reel, permanently.",1,Uncommon,TRUE
+pill,Pill,pill,Permanently increase a number on a reel.,1,Common,TRUE
+mirror,Mirror,mirror,Permanently clone a number on a reel.,1,Rare,TRUE
+atm,ATM,atm,Spend $30 to give another tool one more use this spin.,1,Legendary,
+lock,Lock,lock,Fix a reel at its current number for the next spin.,1,Uncommon,
+qubit,Superposition,trident,"Permanently replace a slot on a reel with a Superposition, which lets you choose between whether it's a zero or a one.",2,Rare,TRUE
+butterfly,Butterfly,butterfly,Permanently change a trinket into another of the same rarity.,1,Legendary,
+incrementall,Increment All,fast up button,Add 1 to ALL reels (9 becomes 0).,1,Common,
+decrementall,Decrement All,fast down button,Subtract 1 from ALL reels (0 becomes 9).,1,Common,

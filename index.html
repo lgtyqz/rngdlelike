@@ -9,7 +9,7 @@
       content="Your favorite dle, now in your favorite genre. Spin 20 times, collect trinkets, bend your luck, and chase a high score."
     />
     <title>RNGdlelike</title>
-    <link rel="icon" href="openmoji-svg-color/1F3B2.svg" type="image/svg+xml" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
     <link
       rel="preload"
       href="assets/fonts/lexend-regular.ttf"
@@ -23,27 +23,53 @@
   <body>
     <main id="app"></main>
     <div id="tooltip" role="tooltip" hidden></div>
-    <dialog id="help">
-      <h2>A little luck. A little strategy.</h2>
+    <dialog id="help" class="info-dialog" aria-labelledby="help-title">
+      <h2 id="help-title">How to play</h2>
+      <p>You have 20 spins, which spin 6 reels to land on random digits.</p>
+      <p>Use tools to change what digits get scored.</p>
       <p>
-        You have 20 spins. Each reel lands on a digit from 0 to 9. Your trinkets
-        turn those digits into points.
+        Depending on what you get, your trinkets turn those digits into points!
       </p>
       <p>
-        After spinning, select a tool, then a reel to change it. Tools recharge
-        every spin. Hover or focus any item to learn what it does; tap trinkets
-        to inspect them.
+        Beat that spin's goal for a cash bonus, then buy trinkets, tools, or
+        tool upgrades in the shop to get you even more points. Missing a goal
+        never ends your run!
       </p>
       <p>
-        Get points to activate your trinkets. Beat that spin's goal for a cash
-        bonus, then buy trinkets, tools, or upgrades in the shop. Missing a goal
-        never ends your run.
+        (Hover or focus any item to learn what it does; tap trinkets to inspect
+        them.)
       </p>
+      <p>(Also hover or tap a reel's magnifying glass to see its pool.)</p>
       <p>
         Daily runs reset at midnight UTC. The same seed and choices produce the
         same results. Your run saves automatically in this browser.
       </p>
-      <form method="dialog"><button class="button small">GOT IT!</button></form>
+      <form method="dialog">
+        <button class="button small">GOT IT CHIEF</button>
+      </form>
+    </dialog>
+    <dialog id="credits" class="info-dialog" aria-labelledby="credits-title">
+      <h2 id="credits-title">Credits</h2>
+      <p>Game design by <strong>LGTYQZ</strong>.</p>
+      <p>
+        All emoji assets by
+        <a
+          href="https://openmoji.org/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >OpenMoji</a
+        >.
+      </p>
+      <p>
+        Sound effects from
+        <a
+          href="https://pixabay.com/sound-effects/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Pixabay</a
+        >.
+      </p>
+      <form method="dialog"><button class="button small">CLOSE</button></form>
     </dialog>
     <noscript>This game needs JavaScript enabled to spin the reels.</noscript>
   </body>
