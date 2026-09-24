@@ -91,7 +91,6 @@ export function createRun(seed, mode = "normal", date = null) {
     );
     acquire(state, def.id);
   }
-  acquire(state, "camera");
   return state;
 }
 
