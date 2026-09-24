@@ -24,14 +24,29 @@ import {
 } from "./engine.js";
 import { dailySeed, dailyDateForSeed, utcDate, parseSeed } from "./random.js";
 
-import { GameAudio } from "./audio.js";
+import { BackgroundMusic, GameAudio } from "./audio.js";
 import { animateCount } from "./animation.js";
 
 const sound = new GameAudio();
+const recordPlayer = document.querySelector("#record-player");
+const musicToggle = document.querySelector("#music-toggle");
+const musicVolume = document.querySelector("#music-volume");
+const music = new BackgroundMusic((playing) => {
+  recordPlayer.classList.toggle("playing", playing);
+  musicToggle.setAttribute("aria-pressed", String(playing));
+  musicToggle.setAttribute(
+    "aria-label",
+    playing ? "Stop background music" : "Play background music",
+  );
+});
+musicVolume.value = String(Math.round(music.volume * 100));
+musicToggle.addEventListener("click", () => music.toggle());
+musicVolume.addEventListener("input", () => music.setVolume(musicVolume.value / 100));
 const app = document.querySelector("#app");
 const tooltip = document.querySelector("#tooltip");
 const help = document.querySelector("#help");
 const credits = document.querySelector("#credits");
+const changelog = document.querySelector("#changelog");
 const SAVE_KEY = "rngdlelike.run.v2";
 const COLORS = [
   "#e34058",
@@ -78,6 +93,7 @@ let ui = {
   displayTotal: 0,
   displayBank: 0,
   spinningLocks: null,
+  purchaseResult: "",
 };
 
 /** Escapes a value for safe interpolation into generated HTML. */
@@ -409,8 +425,9 @@ function renderMenu() {
       }
       <footer class="menu-footer">
         ${soundButton()}
-          <button class="text-button" data-action="help">How to play</button>
+        <button class="text-button" data-action="help">How to play</button>
         <button class="text-button" data-action="credits">Credits</button>
+        <button class="text-button" data-action="changelog">Changelog</button>
       </footer>
     </section>
   `;
@@ -673,7 +690,12 @@ function renderGame({ animateOffers = false } = {}) {
     content = inventory();
     action = `${button("share", "SHARE")}${button("menu", "PLAY AGAIN!")}`;
   } else if (current === "shop") {
-    content = offers(animateOffers) + inventory();
+    content =
+      offers(animateOffers) +
+      (ui.purchaseResult
+        ? `<p class="purchase-result" role="status">${esc(ui.purchaseResult)}</p>`
+        : "") +
+      inventory();
     action = button("next", "NEXT ROUND!");
   } else {
     content = reels();
@@ -809,10 +831,12 @@ function render({ focus = false, animate = true, animateOffers = false } = {}) {
 function start(mode, seed, date = null) {
   state = createRun(seed, mode, date);
   sound.play("start");
+  music.start();
   ui = {
     ...ui,
     menu: false,
     busy: false,
+    purchaseResult: "",
     selected: null,
     source: null,
     phase: null,
@@ -1097,7 +1121,10 @@ async function doScore() {
     },
   });
   await waitForScore(250);
-  if (state.phase === "finished") sound.play("finish");
+  if (state.phase === "finished") {
+    music.stop(true);
+    sound.play("finish");
+  }
   ui.phase = null;
   ui.busy = false;
   render({ focus: true });
@@ -1308,7 +1335,7 @@ function closeInfoDialog(dialog) {
   }, 180);
 }
 
-for (const dialog of [help, credits]) {
+for (const dialog of [help, credits, changelog]) {
   dialog.addEventListener("cancel", (event) => {
     event.preventDefault();
     closeInfoDialog(dialog);
@@ -1374,9 +1401,9 @@ app.addEventListener("click", async (event) => {
     scoreWait?.();
     return;
   }
-  if (action === "help" || action === "credits") {
+  if (["help", "credits", "changelog"].includes(action)) {
     hideTooltip();
-    (action === "help" ? help : credits).showModal();
+    ({ help, credits, changelog })[action].showModal();
     return;
   }
   if (ui.busy) return;
@@ -1397,7 +1424,9 @@ app.addEventListener("click", async (event) => {
     }
     case "resume":
       state = structuredClone(saved);
+      music.start();
       ui.menu = false;
+      ui.purchaseResult = "";
       ui.phase = null;
       ui.selected = null;
       ui.source = null;
@@ -1417,6 +1446,7 @@ app.addEventListener("click", async (event) => {
       break;
     case "shop":
       if (enterShop(state)) {
+        ui.purchaseResult = "";
         persist();
         render({ focus: true, animateOffers: true });
       }
@@ -1485,18 +1515,33 @@ app.addEventListener("click", async (event) => {
       break;
     case "buy": {
       const index = Number(el.dataset.offer),
-        offer = state.offers[index];
+        offer = state.offers[index],
+        previousTrinketCount = state.trinkets.length;
       if (!buy(state, index)) {
         sound.play("error");
         break;
       }
+      const gainedTrinkets = state.trinkets.slice(previousTrinketCount);
+      ui.purchaseResult =
+        gainedTrinkets.length > 1
+          ? `${ITEMS[offer.id].name} ${offer.id === "test-tube" ? "copied" : "gained"} ${ITEMS[gainedTrinkets.at(-1).id].name}.`
+          : "";
       sound.play("buy");
       persist();
       render({ animate: false });
       const bin = document.querySelector(
         `#${offer.kind === "trinket" ? "trinkets" : "tools"}-bin`,
       );
-      const item = bin.querySelector(`[data-item="${offer.id}"]`);
+      for (let i = previousTrinketCount; i < state.trinkets.length; i++)
+        bin.querySelector(`[data-inventory-index="${i}"]`)?.classList.add(
+          "new-item",
+        );
+      const item = gainedTrinkets.length
+        ? bin.querySelector(
+            `[data-inventory-index="${state.trinkets.length - 1}"]`,
+          )
+        : bin.querySelector(`[data-item="${offer.id}"]`);
+      if (!item) break;
       item.classList.add("new-item");
       bin.scrollTo({
         left:
@@ -1510,6 +1555,7 @@ app.addEventListener("click", async (event) => {
     }
     case "reroll-shop":
       if (rerollShop(state)) {
+        ui.purchaseResult = "";
         sound.play("reroll");
         persist();
         render({ animateOffers: true });

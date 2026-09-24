@@ -27,6 +27,39 @@
     <script type="module" src="js/app.js"></script>
   </head>
   <body>
+    <div class="record-player" id="record-player">
+      <button
+        class="record-player-toggle"
+        id="music-toggle"
+        type="button"
+        aria-label="Play background music"
+        aria-pressed="false"
+      >
+        <img src="assets/Record.svg" alt="" />
+      </button>
+      <img class="record-player-arm" src="assets/Arm.svg" alt="" />
+      <div class="record-player-notes" aria-hidden="true">
+        <img src="openmoji-svg-color/1F3B5.svg" alt="" />
+        <img src="openmoji-svg-color/1F3B6.svg" alt="" />
+        <img src="openmoji-svg-color/1F3B5.svg" alt="" />
+      </div>
+      <label class="record-player-volume" for="music-volume">
+        <span>Music volume</span>
+        <input id="music-volume" type="range" min="0" max="100" value="35" />
+      </label>
+    </div>
+    <aside class="game-promo" aria-labelledby="game-promo-title">
+      <div class="game-promo-text">
+        <h2 id="game-promo-title">Like this game?</h2>
+        <a
+          href="https://store.steampowered.com/app/5081930/Gambit_Gardens/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Try the Gambit Gardens demo on Steam!</a
+        >
+      </div>
+      <img id="game-promo-logo" src="/assets/Snale-icon.svg" />
+    </aside>
     <main id="app"></main>
     <div id="tooltip" role="tooltip" hidden></div>
     <dialog id="help" class="info-dialog" aria-labelledby="help-title">
@@ -76,6 +109,49 @@
         >.
       </p>
       <form method="dialog"><button class="button small">CLOSE</button></form>
+    </dialog>
+    <dialog
+      id="changelog"
+      class="info-dialog"
+      aria-labelledby="changelog-title"
+    >
+      <h2 id="changelog-title">Changelog</h2>
+      <p>Current changes</p>
+      <ul>
+        <li>There's music! Check out the record player in the top left.</li>
+        <li>
+          Mirror is now a one-use Legendary tool that makes an exact copy of a
+          trinket.
+        </li>
+        <li>Tool prices in the shop have increased by 25% before discounts.</li>
+        <li>Robot gains 10 (2) power when it sees a 0 or 1, up from 1.</li>
+        <li>
+          Rabbit starts at 177 power and gains 177 on a divisible-by-7 result to
+          better fit its legendary status.
+        </li>
+        <li>
+          The Flush family got buffed: Flush is now Rare and scores 500 points.
+          Mini-Flush now scores 200. Monocle scores 1,000 points.
+        </li>
+        <li>Octopus has a custom $38 price.</li>
+        <li>
+          Descriptions for Brainrot III and Replication Experiment have been
+          clarified.
+        </li>
+        <li>
+          W gives an additional $75 on hitting the round goal instead of
+          doubling the round goal. $375 seems a lot more reasonable than $6000+
+          if you know what I mean. 🌚
+        </li>
+        <li>Butterfly has been moved to Rare.</li>
+        <li>
+          New tool! Sparkles permanently changes one trinket into an unowned
+          trinket of the next rarity.
+        </li>
+        <li>Soap can now remove the last slot from a reel. 🌚</li>
+        <li>Last but not least, put in a plug for my other big project. :)</li>
+      </ul>
+      <form method="dialog"><button class="button small">GOT IT</button></form>
     </dialog>
     <noscript>This game needs JavaScript enabled to spin the reels.</noscript>
   </body>

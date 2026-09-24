@@ -25,6 +25,7 @@ export const rerollPrice = (state) =>
 
 const count = (state, id) => state.trinkets.filter((t) => t.id === id).length;
 const availableTrinkets = TRINKETS.filter((t) => t.rarity !== "fallback");
+const trinketRarities = ["common", "uncommon", "rare", "legendary"];
 const shopBoost = (state) =>
   1.25 ** count(state, "mining") * 1.5 ** count(state, "magnifier");
 
@@ -197,7 +198,7 @@ function recordSeen(state, indices) {
     const value = reelValue(state.reels[index]);
     for (const item of [...state.trinkets]) {
       if (item.id === "robot" && (value === 0 || value === 1)) {
-        item.metadata.power++;
+        item.metadata.power += 2;
         state.seenEvents.push({
           index,
           id: item.id,
@@ -308,14 +309,13 @@ export function useTool(state, id, target, source = null) {
   const pool = reel ? state.reelPools[target] : null;
   const position = reel ? state.positions[target] : -1;
   if (
-    ["bomb", "w", "soap", "pill", "mirror", "qubit"].includes(id) &&
+    ["bomb", "w", "soap", "pill", "qubit"].includes(id) &&
     (!pool || position < 0 || position >= pool.length)
   )
     return false;
   if (id === "decrement" && !isDigit(old) && bombCount === null) return false;
   if (["increment", "double", "flip", "pill"].includes(id) && !isDigit(old))
     return false;
-  if (id === "soap" && pool.length <= 1) return false;
   if (id === "lock" && !isDigit(old)) return false;
   switch (id) {
     case "incrementall":
@@ -414,10 +414,14 @@ export function useTool(state, id, target, source = null) {
       state.positions[target] = -1;
       state.reels[target] = null;
       break;
-    case "mirror":
-      seenIndices = [];
-      pool.push(structuredClone(pool[position]));
+    case "mirror": {
+      const item = Number.isInteger(target)
+        ? state.trinkets[target]
+        : state.trinkets.find((t) => t.id === target);
+      if (!item) return false;
+      state.trinkets.push(structuredClone(item));
       break;
+    }
     case "lock":
       seenIndices = [];
       state.nextLocks[target] = old;
@@ -442,6 +446,31 @@ export function useTool(state, id, target, source = null) {
         choose(candidates, effectRng(state, "butterfly")) ?? ITEMS.bug;
       state.trinkets.splice(state.trinkets.indexOf(item), 1);
       acquire(state, replacement.id);
+      break;
+    }
+    case "sparkles": {
+      const item = Number.isInteger(target)
+        ? state.trinkets[target]
+        : state.trinkets.find((t) => t.id === target);
+      if (!item) return false;
+      const rarityIndex = trinketRarities.indexOf(ITEMS[item.id].rarity);
+      if (rarityIndex < 0) {
+        return false;
+      }
+      const nextRarity =
+        rarityIndex === trinketRarities.length - 1
+          ? trinketRarities[rarityIndex]
+          : trinketRarities[rarityIndex + 1];
+      const candidates = availableTrinkets.filter(
+        (t) => t.rarity === nextRarity && !has(state, t.id),
+      );
+      if (!candidates.length) {
+        acquire(state, "bug");
+      } else {
+        const replacement = choose(candidates, effectRng(state, "sparkles"));
+        state.trinkets.splice(state.trinkets.indexOf(item), 1);
+        acquire(state, replacement.id);
+      }
       break;
     }
     case "camera": {
@@ -514,10 +543,12 @@ function randomTrinket(state, rarities = null) {
 }
 
 function openPackage(state) {
-  const order = ["common", "uncommon", "rare", "legendary"];
   const others = state.trinkets.filter((t) => t.id !== "package");
   for (const item of others) {
-    const rarity = order[Math.min(3, order.indexOf(ITEMS[item.id].rarity) + 1)];
+    const rarity =
+      trinketRarities[
+        Math.min(3, trinketRarities.indexOf(ITEMS[item.id].rarity) + 1)
+      ];
     const pool = availableTrinkets.filter(
       (t) => t.rarity === rarity && t.id !== "package" && !has(state, t.id),
     );
@@ -665,12 +696,12 @@ export function settleSpin(state) {
   state.reels.forEach((value, index) => {
     if (value !== "W") return;
     const extra = runningBonus;
-    runningBonus *= 2;
+    runningBonus += 75;
     state.events.push({
       id: "w",
       points: 0,
       cash: extra,
-      note: extra ? "Goal bonus doubled" : "No goal bonus to double",
+      note: extra ? "Goal bonus increased by $75" : "No goal bonus to double",
       reels: [index],
       bonusTotal: runningBonus,
       steps: [],
@@ -799,7 +830,9 @@ export function generateOffers(state) {
           id: def.id,
           kind: "tool",
           rarity: def.rarity,
-          price: Math.ceil(itemPrice(def) * (has(state, "wrench") ? 0.5 : 1)),
+          price: Math.ceil(
+            itemPrice(def) * 1.25 * (has(state, "wrench") ? 0.5 : 1),
+          ),
           sold: false,
         }
       : { kind: "tool", empty: true },

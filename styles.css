@@ -84,6 +84,171 @@ button {
 #app {
   min-height: 100svh;
 }
+.game-promo {
+  position: fixed;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  z-index: 20;
+  top: 24px;
+  right: 24px;
+  padding: 16px 16px;
+  border: 1px solid #d6d6d6;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 12px #0000001a;
+}
+.game-promo-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 10vw;
+}
+.game-promo h2 {
+  margin-bottom: 4px;
+  color: #343434;
+  font-size: 15px;
+  font-weight: 700;
+}
+.game-promo a {
+  color: #405be3;
+  font-size: 13px;
+  line-height: 1.4;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+img#game-promo-logo {
+  width: 5vw;
+  margin-left: 1vw;
+}
+.record-player {
+  position: fixed;
+  z-index: 20;
+  top: 24px;
+  left: 30px;
+  width: 88px;
+  height: 124px;
+}
+.record-player-toggle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 74px;
+  height: 74px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+.record-player-toggle img {
+  width: 74px;
+  height: 74px;
+}
+.record-player.playing .record-player-toggle img {
+  animation: record-spin 2.5s linear infinite;
+}
+.record-player-arm {
+  position: absolute;
+  top: 6px;
+  left: 78px;
+  width: 10px;
+  height: 59px;
+  pointer-events: none;
+  transform-origin: 5px 3px;
+  transform: rotate(0deg);
+  transition: transform 650ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.record-player.playing .record-player-arm {
+  transform: rotate(35deg);
+}
+.record-player-notes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 74px;
+  height: 74px;
+  pointer-events: none;
+}
+.record-player-notes img {
+  position: absolute;
+  left: 32px;
+  top: 12px;
+  width: 22px;
+  height: 22px;
+  opacity: 0;
+}
+.record-player.playing .record-player-notes img {
+  animation: record-note 2.7s ease-out infinite;
+}
+.record-player.playing .record-player-notes img:nth-child(2) {
+  animation-delay: 0.9s;
+}
+.record-player.playing .record-player-notes img:nth-child(3) {
+  animation-delay: 1.8s;
+}
+.record-player-volume {
+  position: absolute;
+  top: 86px;
+  left: 0;
+  width: 88px;
+  color: #565656;
+  font-size: 10px;
+  text-align: center;
+}
+.record-player-volume span {
+  display: block;
+  margin-bottom: 5px;
+}
+.record-player-volume input {
+  appearance: none;
+  display: block;
+  width: 88px;
+  height: 6px;
+  margin: 0;
+  border-radius: 999px;
+  background: #dedede;
+  cursor: pointer;
+}
+.record-player-volume input::-webkit-slider-thumb {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #ee5060;
+  box-shadow: 0 0 0 1px #383838;
+}
+.record-player-volume input::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #ee5060;
+  box-shadow: 0 0 0 1px #383838;
+}
+.record-player-volume input:focus-visible {
+  outline: 3px solid #405be3;
+  outline-offset: 6px;
+}
+@keyframes record-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes record-note {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.7);
+  }
+  15%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(26px, -65px) scale(1.1);
+  }
+}
 .screen {
   animation: screen-in 0.28s ease-out;
 }
@@ -981,6 +1146,12 @@ button {
 .new-item {
   animation: new-item 0.7s ease-out;
 }
+.purchase-result {
+  margin-top: 12px;
+  color: #565656;
+  font-size: 14px;
+  text-align: center;
+}
 #tooltip {
   position: fixed;
   z-index: 20;
@@ -1029,6 +1200,11 @@ dialog p {
   font-size: 14px;
   line-height: 1.7;
   margin-bottom: 16px;
+}
+dialog li {
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 10px;
 }
 dialog form {
   text-align: center;
@@ -1506,6 +1682,12 @@ dialog form {
   }
 }
 @media (max-width: 430px) {
+  .menu {
+    padding-top: 165px;
+  }
+  .game-header {
+    padding-top: 165px;
+  }
   .panel {
     padding: 22px 13px 28px;
   }
@@ -1624,6 +1806,24 @@ dialog form {
     padding: 0 16px;
   }
 }
+@media (max-width: 1100px) {
+  .menu {
+    padding-top: 165px;
+  }
+  .game-header {
+    padding-top: 165px;
+  }
+}
+@media (max-width: 430px) {
+  .record-player {
+    left: 16px;
+  }
+  .game-promo {
+    right: 12px;
+    width: 170px;
+    padding: 10px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1643,6 +1843,10 @@ dialog form {
     animation: none;
   }
   .menu .brand-letter {
+    animation: none;
+  }
+  .record-player.playing .record-player-toggle img,
+  .record-player.playing .record-player-notes img {
     animation: none;
   }
 }

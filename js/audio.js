@@ -1,4 +1,97 @@
 const SOUND_KEY = "rngdlelike.sound.v1";
+const MUSIC_VOLUME_KEY = "rngdlelike.music-volume.v1";
+
+/** Controls the looping theme independently of the sound effect mixer. */
+export class BackgroundMusic {
+  constructor(onChange = () => {}) {
+    this.audio = new Audio(
+      new URL("../assets/sounds/rngdlelike-theme.mp3", import.meta.url),
+    );
+    this.audio.loop = true;
+    this.audio.preload = "none";
+    this.onChange = onChange;
+    this.playing = false;
+    this.level = 0;
+    this.frame = null;
+    this.request = 0;
+    this.volume = 0.2;
+    try {
+      const saved = localStorage.getItem(MUSIC_VOLUME_KEY);
+      if (saved !== null && Number.isFinite(Number(saved)))
+        this.volume = Math.max(0, Math.min(1, Number(saved)));
+    } catch {}
+    this.audio.volume = 0;
+  }
+
+  setVolume(value) {
+    this.volume = Math.max(0, Math.min(1, Number(value) || 0));
+    this.audio.volume = this.volume * this.level;
+    try {
+      localStorage.setItem(MUSIC_VOLUME_KEY, String(this.volume));
+    } catch {}
+  }
+
+  fade(to, duration, done = () => {}) {
+    if (this.frame !== null) cancelAnimationFrame(this.frame);
+    if (globalThis.document?.hidden) {
+      this.frame = null;
+      this.level = to;
+      this.audio.volume = this.volume * to;
+      done();
+      return;
+    }
+    const from = this.level;
+    const started = performance.now();
+    const tick = (now) => {
+      const progress = Math.min(1, (now - started) / duration);
+      this.level = from + (to - from) * progress;
+      this.audio.volume = this.volume * this.level;
+      if (progress < 1) this.frame = requestAnimationFrame(tick);
+      else {
+        this.frame = null;
+        done();
+      }
+    };
+    this.frame = requestAnimationFrame(tick);
+  }
+
+  async start() {
+    if (this.playing) return;
+    const request = ++this.request;
+    this.playing = true;
+    this.onChange(true);
+    try {
+      await this.audio.play();
+      if (request !== this.request) return;
+      if (this.playing) this.fade(1, 900);
+      else this.audio.pause();
+    } catch {
+      if (request !== this.request) return;
+      this.playing = false;
+      this.onChange(false);
+    }
+  }
+
+  stop(reset = false) {
+    this.request++;
+    if (!this.playing && this.audio.paused) {
+      if (reset) this.audio.currentTime = 0;
+      return;
+    }
+    this.playing = false;
+    this.onChange(false);
+    this.fade(0, 350, () => {
+      if (this.playing) return;
+      this.audio.pause();
+      if (reset) this.audio.currentTime = 0;
+    });
+  }
+
+  toggle() {
+    if (this.playing) this.stop();
+    else this.start();
+  }
+}
 
 // Replace the silent WAV placeholders with final assets, or update these paths.
 // Paths are relative to this module; volume is per cue (0–1).

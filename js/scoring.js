@@ -208,7 +208,7 @@ export function scoreTrinket(item, reels, state = null) {
       if (n !== -1)
         add(
           all.filter((i) => reels[i] === n),
-          id === "flush" ? 300 : 150,
+          id === "flush" ? 500 : 200,
         );
       break;
     }
@@ -292,7 +292,7 @@ export function scoreTrinket(item, reels, state = null) {
       const divisor = { rabbit: 7, heaven: 11, three: 3 }[id];
       if (value % divisor === 0) {
         if (id === "heaven") item.metadata.power *= 2;
-        else item.metadata.power += id === "rabbit" ? 77 : 13;
+        else item.metadata.power += id === "rabbit" ? 177 : 13;
       }
       break;
     }
@@ -303,7 +303,7 @@ export function scoreTrinket(item, reels, state = null) {
       flat(value % 5 === 0, 25);
       break;
     case "monocle":
-      flat(new Set(reels).size === 1, 700);
+      flat(new Set(reels).size === 1, 1000);
       break;
     case "elevator":
       flat(

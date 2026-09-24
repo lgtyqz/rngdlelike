@@ -21,5 +21,6 @@ atm,ATM,atm,Spend $30 to give another tool one more use this spin.,1,Legendary,
 lock,Lock,lock,Fix a reel at its current number for the next spin.,1,Uncommon,
 qubit,Superposition,trident,"Permanently replace a slot on a reel with a Superposition, which lets you choose between whether it's a zero or a one.",2,Rare,TRUE
 butterfly,Butterfly,butterfly,Permanently change a trinket into another of the same rarity.,1,Legendary,
+sparkles,Sparkles,sparkles,Permanently change a trinket into another with one higher rarity.,1,Rare,TRUE
 incrementall,Increment All,fast up button,Add 1 to ALL reels (9 becomes 0).,1,Common,
 decrementall,Decrement All,fast down button,Subtract 1 from ALL reels (0 becomes 9).,1,Common,
