@@ -58,6 +58,7 @@ export function createRun(seed, mode = "normal", date = null) {
     locks: Array(6).fill(null),
     nextLocks: Array(6).fill(null),
     pendingEvents: [],
+    packageActivations: 0,
     seenEvents: [],
     bombEvents: [],
     effectRolls: 0,
@@ -543,6 +544,7 @@ function randomTrinket(state, rarities = null) {
 }
 
 function openPackage(state) {
+  state.packageActivations = (state.packageActivations ?? 0) + 1;
   const others = state.trinkets.filter((t) => t.id !== "package");
   for (const item of others) {
     const rarity =

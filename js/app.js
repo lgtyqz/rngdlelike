@@ -41,7 +41,9 @@ const music = new BackgroundMusic((playing) => {
 });
 musicVolume.value = String(Math.round(music.volume * 100));
 musicToggle.addEventListener("click", () => music.toggle());
-musicVolume.addEventListener("input", () => music.setVolume(musicVolume.value / 100));
+musicVolume.addEventListener("input", () =>
+  music.setVolume(musicVolume.value / 100),
+);
 const app = document.querySelector("#app");
 const tooltip = document.querySelector("#tooltip");
 const help = document.querySelector("#help");
@@ -80,6 +82,10 @@ let state = null,
   calendar = {},
   saved = readSave(),
   scoreWait;
+const packageActivations = () => state?.packageActivations ?? 0;
+const playPackageSound = (before) => {
+  if (packageActivations() > before) sound.play("package");
+};
 let ui = {
   menu: true,
   seedInput: new URLSearchParams(location.search).get("seed") ?? "",
@@ -954,10 +960,12 @@ function showReelNotifications() {
 async function doSpin() {
   if (ui.busy) return;
   ui.spinningLocks = [...state.locks];
+  const packageCount = packageActivations();
   if (!spin(state)) {
     ui.spinningLocks = null;
     return;
   }
+  playPackageSound(packageCount);
   ui.busy = true;
   sound.play("spin");
   persist();
@@ -1003,7 +1011,9 @@ async function doScore() {
   ui.displayPoints = 0;
   ui.displayTotal = state.total;
   ui.displayBank = state.bank;
+  const packageCount = packageActivations();
   if (!settleSpin(state)) return;
+  playPackageSound(packageCount);
   persist();
   ui.busy = true;
   ui.phase = "scoring";
@@ -1154,10 +1164,12 @@ async function targetReel(index) {
     return;
   }
   const old = [...state.reels];
+  const packageCount = packageActivations();
   if (!useTool(state, id, index, ui.source)) {
     sound.play("error");
     return;
   }
+  playPackageSound(packageCount);
   ui.selected = null;
   ui.source = null;
   ui.busy = true;
@@ -1180,11 +1192,20 @@ async function targetReel(index) {
 }
 
 function applyInventoryTool(id) {
+  const packageCount = packageActivations();
   if (!useTool(state, ui.selected, id)) {
     sound.play("error");
     return;
   }
-  if (ui.selected === "camera") sound.play("camera");
+  playPackageSound(packageCount);
+  switch (ui.selected) {
+    case "camera":
+      sound.play("camera");
+      break;
+    case "atm":
+      sound.play("atm");
+      break;
+  }
   ui.selected = null;
   ui.source = null;
   persist();
@@ -1516,11 +1537,13 @@ app.addEventListener("click", async (event) => {
     case "buy": {
       const index = Number(el.dataset.offer),
         offer = state.offers[index],
-        previousTrinketCount = state.trinkets.length;
+        previousTrinketCount = state.trinkets.length,
+        packageCount = packageActivations();
       if (!buy(state, index)) {
         sound.play("error");
         break;
       }
+      playPackageSound(packageCount);
       const gainedTrinkets = state.trinkets.slice(previousTrinketCount);
       ui.purchaseResult =
         gainedTrinkets.length > 1
@@ -1533,9 +1556,9 @@ app.addEventListener("click", async (event) => {
         `#${offer.kind === "trinket" ? "trinkets" : "tools"}-bin`,
       );
       for (let i = previousTrinketCount; i < state.trinkets.length; i++)
-        bin.querySelector(`[data-inventory-index="${i}"]`)?.classList.add(
-          "new-item",
-        );
+        bin
+          .querySelector(`[data-inventory-index="${i}"]`)
+          ?.classList.add("new-item");
       const item = gainedTrinkets.length
         ? bin.querySelector(
             `[data-inventory-index="${state.trinkets.length - 1}"]`,
@@ -1574,7 +1597,13 @@ app.addEventListener(
   "wheel",
   (event) => {
     const bin = event.target.closest(".inventory .bin");
-    if (!bin || event.ctrlKey || event.shiftKey || event.deltaX || !event.deltaY)
+    if (
+      !bin ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.deltaX ||
+      !event.deltaY
+    )
       return;
 
     const maxScroll = bin.scrollWidth - bin.clientWidth;
@@ -1649,9 +1678,10 @@ document.addEventListener("visibilitychange", () => {
 });
 /** Describes the current seed and its daily challenge date, when known. */
 function seedInfo() {
-  const date = state.mode === "daily"
-    ? state.date
-    : dailyDateForSeed(state.seed, calendar);
+  const date =
+    state.mode === "daily"
+      ? state.date
+      : dailyDateForSeed(state.seed, calendar);
   return `SEED ${state.seed}${date ? ` - DAILY ${date} UTC` : ""}`;
 }
 

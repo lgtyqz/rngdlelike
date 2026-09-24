@@ -112,6 +112,8 @@ export const SOUND_REGISTRY = {
   bonus: { src: "../assets/sounds/bonus.wav", volume: 0.8 },
   finish: { src: "../assets/sounds/finish.wav", volume: 0.8 },
   error: { src: "../assets/sounds/error.wav", volume: 0.8 },
+  atm: { src: "../assets/sounds/atm.wav", volume: 0.8 },
+  package: { src: "../assets/sounds/box.wav", volume: 0.8 },
 };
 
 /** Owns a lazily unlocked audio context and the persistent sound preference. */
