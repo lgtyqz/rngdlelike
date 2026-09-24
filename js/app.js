@@ -626,7 +626,7 @@ function offers(animateSpawn = false) {
     .join("");
 
   return `
-    <div class="shop-shelf">
+    <div class="shop-shelf" style="--offer-count: ${state.offers.length}">
       ${offerButtons}
       <div class="reroll-control">
         <button

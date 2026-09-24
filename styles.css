@@ -753,7 +753,7 @@ button {
 }
 .shop-shelf {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) 135px;
+  grid-template-columns: repeat(var(--offer-count), minmax(0, 1fr)) 135px;
   gap: 8px;
   min-height: 173px;
   align-items: center;
@@ -1287,7 +1287,7 @@ dialog form {
     font-size: 80px;
   }
   .shop-shelf {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) 112px;
+    grid-template-columns: repeat(var(--offer-count), minmax(0, 1fr)) 112px;
   }
   .reroll-control .button {
     padding: 10px 12px;
@@ -1399,7 +1399,7 @@ dialog form {
     margin-top: 26px;
   }
   .shop-shelf {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--offer-count), minmax(0, 1fr));
     gap: 6px;
     min-height: 190px;
   }
