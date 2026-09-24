@@ -3,7 +3,6 @@ const SOUND_KEY = "rngdlelike.sound.v1";
 // Replace the silent WAV placeholders with final assets, or update these paths.
 // Paths are relative to this module; volume is per cue (0–1).
 export const SOUND_REGISTRY = {
-  click: { src: "../assets/sounds/click.wav", volume: 0.8 },
   mousedown: { src: "../assets/sounds/mousedown.wav", volume: 0.5 },
   mouseup: { src: "../assets/sounds/mouseup.wav", volume: 0.8 },
   legendary: { src: "../assets/sounds/legendary.wav", volume: 0.8 },
@@ -14,12 +13,10 @@ export const SOUND_REGISTRY = {
   spin: { src: "../assets/sounds/spin.wav", volume: 0.8 },
   tick: { src: "../assets/sounds/tick.wav", volume: 0.8 },
   land: { src: "../assets/sounds/land.wav", volume: 0.8 },
-  tool: { src: "../assets/sounds/tool.wav", volume: 0.8 },
   score: { src: "../assets/sounds/score.wav", volume: 0.8 },
   reroll: { src: "../assets/sounds/reroll.wav", volume: 0.8 },
   buy: { src: "../assets/sounds/buy.wav", volume: 0.8 },
   bonus: { src: "../assets/sounds/bonus.wav", volume: 0.8 },
-  settle: { src: "../assets/sounds/settle.wav", volume: 0.8 },
   finish: { src: "../assets/sounds/finish.wav", volume: 0.8 },
   error: { src: "../assets/sounds/error.wav", volume: 0.8 },
 };
