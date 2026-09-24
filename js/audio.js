@@ -14,6 +14,8 @@ export class BackgroundMusic {
     this.level = 0;
     this.frame = null;
     this.request = 0;
+    this.context = null;
+    this.gain = null;
     this.volume = 0.2;
     try {
       const saved = localStorage.getItem(MUSIC_VOLUME_KEY);
@@ -25,10 +27,32 @@ export class BackgroundMusic {
 
   setVolume(value) {
     this.volume = Math.max(0, Math.min(1, Number(value) || 0));
-    this.audio.volume = this.volume * this.level;
+    this.applyVolume();
     try {
       localStorage.setItem(MUSIC_VOLUME_KEY, String(this.volume));
     } catch {}
+  }
+
+  applyVolume() {
+    const volume = this.volume * this.level;
+    if (this.gain) this.gain.gain.value = volume;
+    else this.audio.volume = volume;
+  }
+
+  // Create the graph during a user gesture so mobile browsers can unlock it.
+  prepareAudio() {
+    const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (!this.context && AudioContext) {
+      this.context = new AudioContext();
+      this.gain = this.context.createGain();
+      this.applyVolume();
+      this.source = this.context.createMediaElementSource(this.audio);
+      this.source.connect(this.gain);
+      this.gain.connect(this.context.destination);
+      this.audio.volume = 1;
+    }
+    if (this.context && this.context.state !== "running")
+      return this.context.resume();
   }
 
   fade(to, duration, done = () => {}) {
@@ -36,7 +60,7 @@ export class BackgroundMusic {
     if (globalThis.document?.hidden) {
       this.frame = null;
       this.level = to;
-      this.audio.volume = this.volume * to;
+      this.applyVolume();
       done();
       return;
     }
@@ -45,7 +69,7 @@ export class BackgroundMusic {
     const tick = (now) => {
       const progress = Math.min(1, (now - started) / duration);
       this.level = from + (to - from) * progress;
-      this.audio.volume = this.volume * this.level;
+      this.applyVolume();
       if (progress < 1) this.frame = requestAnimationFrame(tick);
       else {
         this.frame = null;
@@ -61,12 +85,14 @@ export class BackgroundMusic {
     this.playing = true;
     this.onChange(true);
     try {
-      await this.audio.play();
+      // Call both before awaiting to preserve the tap's playback permission.
+      await Promise.all([this.prepareAudio(), this.audio.play()]);
       if (request !== this.request) return;
       if (this.playing) this.fade(1, 900);
       else this.audio.pause();
     } catch {
       if (request !== this.request) return;
+      this.audio.pause();
       this.playing = false;
       this.onChange(false);
     }

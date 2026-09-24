@@ -28,6 +28,8 @@ const availableTrinkets = TRINKETS.filter((t) => t.rarity !== "fallback");
 const trinketRarities = ["common", "uncommon", "rare", "legendary"];
 const shopBoost = (state) =>
   1.25 ** count(state, "mining") * 1.5 ** count(state, "magnifier");
+const toolPrice = (state, def) =>
+  Math.ceil(itemPrice(def) * 1.4 * (has(state, "wrench") ? 0.5 : 1));
 
 /**
  * Creates a new game state for a normal, daily, or shared-seed run.
@@ -832,9 +834,7 @@ export function generateOffers(state) {
           id: def.id,
           kind: "tool",
           rarity: def.rarity,
-          price: Math.ceil(
-            itemPrice(def) * 1.25 * (has(state, "wrench") ? 0.5 : 1),
-          ),
+          price: toolPrice(state, def),
           sold: false,
         }
       : { kind: "tool", empty: true },
@@ -921,9 +921,7 @@ export function buy(state, index) {
   for (const entry of state.offers.filter((o) => !o.empty && !o.sold)) {
     const def = ITEMS[entry.id];
     if (entry.kind === "tool")
-      entry.price = Math.ceil(
-        itemPrice(def) * (has(state, "wrench") ? 0.5 : 1),
-      );
+      entry.price = toolPrice(state, def);
     if (entry.kind === "upgrade") {
       const owned = state.tools.find((t) => t.id === entry.id);
       if (owned)
