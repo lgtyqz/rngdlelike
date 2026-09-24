@@ -196,8 +196,14 @@ function recordSeen(state, indices) {
   for (const index of indices) {
     const value = reelValue(state.reels[index]);
     for (const item of [...state.trinkets]) {
-      if (item.id === "robot" && (value === 0 || value === 1))
+      if (item.id === "robot" && (value === 0 || value === 1)) {
         item.metadata.power++;
+        state.seenEvents.push({
+          index,
+          id: item.id,
+          note: `+1 P0W3R: N3W P0W3R: ${item.metadata.power}`,
+        });
+      }
       if (item.id === "octopus" && value === 8) {
         const cash = has(state, "eightball") ? 16 : 8;
         state.bank += cash;
