@@ -85,10 +85,13 @@ button {
   min-height: 100svh;
 }
 .game-promo {
-  position: fixed;
+  position: absolute;
   display: flex;
   flex-direction: row;
   align-items: center;
+  gap: 12px;
+  width: 280px;
+  max-width: 100%;
   z-index: 20;
   top: 24px;
   right: 24px;
@@ -102,7 +105,9 @@ button {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  max-width: 10vw;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .game-promo h2 {
   margin-bottom: 4px;
@@ -118,16 +123,17 @@ button {
   text-underline-offset: 3px;
 }
 img#game-promo-logo {
-  width: 5vw;
-  margin-left: 1vw;
+  flex: 0 0 auto;
+  width: 64px;
+  height: auto;
 }
 .record-player {
-  position: fixed;
+  position: absolute;
   z-index: 20;
   top: 24px;
   left: 30px;
   width: 88px;
-  height: 124px;
+  height: 136px;
 }
 .record-player-toggle {
   position: absolute;
@@ -203,10 +209,10 @@ img#game-promo-logo {
   appearance: none;
   display: block;
   width: 88px;
-  height: 6px;
+  height: 24px;
   margin: 0;
   border-radius: 999px;
-  background: #dedede;
+  background: linear-gradient(#dedede, #dedede) center / 100% 6px no-repeat;
   cursor: pointer;
 }
 .record-player-volume input::-webkit-slider-thumb {
@@ -1807,21 +1813,46 @@ dialog form {
   }
 }
 @media (max-width: 1100px) {
-  .menu {
-    padding-top: 165px;
+  .page-extras {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 24px 16px 0;
   }
+  .record-player {
+    position: relative;
+    inset: auto;
+    flex: 0 0 88px;
+  }
+  .game-promo {
+    position: static;
+    flex: 0 1 280px;
+    width: auto;
+    min-width: 180px;
+    margin-left: auto;
+  }
+  #app {
+    min-height: auto;
+  }
+  .menu,
   .game-header {
-    padding-top: 165px;
+    padding-top: 24px;
   }
 }
 @media (max-width: 430px) {
-  .record-player {
-    left: 16px;
+  .page-extras {
+    gap: 12px;
+    padding-inline: 12px;
   }
   .game-promo {
-    right: 12px;
-    width: 170px;
+    flex-basis: calc(100% - 100px);
+    gap: 8px;
     padding: 10px;
+  }
+  img#game-promo-logo {
+    width: 40px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

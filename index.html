@@ -27,39 +27,41 @@
     <script type="module" src="js/app.js"></script>
   </head>
   <body>
-    <div class="record-player" id="record-player">
-      <button
-        class="record-player-toggle"
-        id="music-toggle"
-        type="button"
-        aria-label="Play background music"
-        aria-pressed="false"
-      >
-        <img src="assets/Record.svg" alt="" />
-      </button>
-      <img class="record-player-arm" src="assets/Arm.svg" alt="" />
-      <div class="record-player-notes" aria-hidden="true">
-        <img src="openmoji-svg-color/1F3B5.svg" alt="" />
-        <img src="openmoji-svg-color/1F3B6.svg" alt="" />
-        <img src="openmoji-svg-color/1F3B5.svg" alt="" />
-      </div>
-      <label class="record-player-volume" for="music-volume">
-        <span>Music volume</span>
-        <input id="music-volume" type="range" min="0" max="100" value="35" />
-      </label>
-    </div>
-    <aside class="game-promo" aria-labelledby="game-promo-title">
-      <div class="game-promo-text">
-        <h2 id="game-promo-title">Like this game?</h2>
-        <a
-          href="https://store.steampowered.com/app/5081930/Gambit_Gardens/"
-          target="_blank"
-          rel="noopener noreferrer"
-          >Try the Gambit Gardens demo on Steam!</a
+    <div class="page-extras">
+      <div class="record-player" id="record-player">
+        <button
+          class="record-player-toggle"
+          id="music-toggle"
+          type="button"
+          aria-label="Play background music"
+          aria-pressed="false"
         >
+          <img src="assets/Record.svg" alt="" />
+        </button>
+        <img class="record-player-arm" src="assets/Arm.svg" alt="" />
+        <div class="record-player-notes" aria-hidden="true">
+          <img src="openmoji-svg-color/1F3B5.svg" alt="" />
+          <img src="openmoji-svg-color/1F3B6.svg" alt="" />
+          <img src="openmoji-svg-color/1F3B5.svg" alt="" />
+        </div>
+        <label class="record-player-volume" for="music-volume">
+          <span>Music volume</span>
+          <input id="music-volume" type="range" min="0" max="100" value="35" />
+        </label>
       </div>
-      <img id="game-promo-logo" src="./assets/Snale-icon.svg" />
-    </aside>
+      <aside class="game-promo" aria-labelledby="game-promo-title">
+        <div class="game-promo-text">
+          <h2 id="game-promo-title">Like this game?</h2>
+          <a
+            href="https://store.steampowered.com/app/5081930/Gambit_Gardens/"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Try the Gambit Gardens demo on Steam!</a
+          >
+        </div>
+        <img id="game-promo-logo" src="./assets/Snale-icon.svg" alt="" />
+      </aside>
+    </div>
     <main id="app"></main>
     <div id="tooltip" role="tooltip" hidden></div>
     <dialog id="help" class="info-dialog" aria-labelledby="help-title">
