@@ -22,7 +22,7 @@ import {
   rerollPrice,
   shareText,
 } from "./engine.js";
-import { dailySeed, utcDate, parseSeed } from "./random.js";
+import { dailySeed, dailyDateForSeed, utcDate, parseSeed } from "./random.js";
 
 import { GameAudio } from "./audio.js";
 import { animateCount } from "./animation.js";
@@ -740,8 +740,6 @@ function renderGame({ animateOffers = false } = {}) {
       );
     }
   }
-  const mode =
-    state.mode === "daily" ? `DAILY - ${state.date} UTC` : `SEED ${state.seed}`;
   app.innerHTML = `
     <section class="screen game">
       <header class="game-header">
@@ -763,7 +761,7 @@ function renderGame({ animateOffers = false } = {}) {
         }
       </div>
       <footer class="game-footer">
-        <span>${esc(mode)}</span>
+        <span data-seed-info>${esc(seedInfo())}</span>
         <div>
           ${soundButton()}
           <button class="text-button" data-action="help">How to play</button>
@@ -1176,7 +1174,7 @@ async function share() {
     state.mode === "daily" ? "daily" : "seed",
     state.mode === "daily" ? state.date : String(state.seed),
   );
-  const text = shareText(state, url.href);
+  const text = shareText(state, url.href, calendar);
   try {
     await navigator.clipboard.writeText(text);
     document.querySelector('[data-action="share"]').textContent = "COPIED!";
@@ -1525,6 +1523,29 @@ app.addEventListener("click", async (event) => {
       break;
   }
 });
+// Let a vertical mouse wheel browse the horizontal inventory rows.
+app.addEventListener(
+  "wheel",
+  (event) => {
+    const bin = event.target.closest(".inventory .bin");
+    if (!bin || event.ctrlKey || event.shiftKey || event.deltaX || !event.deltaY)
+      return;
+
+    const maxScroll = bin.scrollWidth - bin.clientWidth;
+    if (
+      maxScroll <= 0 ||
+      (event.deltaY < 0 && bin.scrollLeft <= 0) ||
+      (event.deltaY > 0 && bin.scrollLeft >= maxScroll - 1)
+    )
+      return;
+
+    const unit =
+      event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? bin.clientWidth : 1;
+    event.preventDefault();
+    bin.scrollBy({ left: event.deltaY * unit, behavior: "instant" });
+  },
+  { passive: false },
+);
 let poolHideTimer;
 app.addEventListener("click", (event) => {
   const trigger = event.target.closest("[data-pool]");
@@ -1580,6 +1601,14 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) sound.stop();
   if (!document.hidden && ui.menu) render({ animate: false });
 });
+/** Describes the current seed and its daily challenge date, when known. */
+function seedInfo() {
+  const date = state.mode === "daily"
+    ? state.date
+    : dailyDateForSeed(state.seed, calendar);
+  return `SEED ${state.seed}${date ? ` - DAILY ${date} UTC` : ""}`;
+}
+
 render();
 // The fallback uses the same published algorithm, so the daily remains identical offline.
 fetch("data/daily-seeds.json")
@@ -1589,5 +1618,7 @@ fetch("data/daily-seeds.json")
   })
   .then((data) => {
     calendar = data;
+    const info = app.querySelector("[data-seed-info]");
+    if (info && state) info.textContent = seedInfo();
   })
   .catch(() => {});

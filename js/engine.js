@@ -6,7 +6,7 @@ import {
   ownItem,
   itemPrice,
 } from "./items.js";
-import { hash, random } from "./random.js";
+import { hash, random, dailyDateForSeed } from "./random.js";
 import { scoreTrinket, isDigit, has, reelValue } from "./scoring.js";
 export { scoreTrinket } from "./scoring.js";
 export const TOTAL_SPINS = 20;
@@ -931,11 +931,15 @@ export function nextRound(state) {
  * Builds the multiline result and challenge text copied by the share action.
  * @param {object} state Completed or in-progress game state.
  * @param {string} url Challenge URL for the same daily game or seed.
+ * @param {object} [calendar={}] Published daily seeds indexed by UTC date.
  * @returns {string} Shareable plain text.
  */
-export function shareText(state, url) {
+export function shareText(state, url, calendar = {}) {
+  const date = dailyDateForSeed(state.seed, calendar);
   const heading =
-    state.mode === "daily" ? `Daily ${state.date}` : `Seed ${state.seed}`;
+    state.mode === "daily"
+      ? `Daily ${state.date}`
+      : `Seed ${state.seed}${date ? ` - Daily ${date} UTC` : ""}`;
   const results = state.history.map((h) => (h.bonus ? "🟩" : "⬜"));
   return `RNGdlelike - ${heading}\n${state.total.toLocaleString("en-US")} points in ${state.history.length}/20 spins!\n${results.slice(0, 10).join("")}\n${results.slice(10).join("")}\nGoals: ${state.history.filter((h) => h.bonus).length}/20 - Best spin: ${Math.max(0, ...state.history.map((h) => h.points))}\nTrinkets: ${state.trinkets.map((t) => `${ITEMS[t.id].emoji}`).join("")}\nTools: ${state.tools.map((t) => `${ITEMS[t.id].emoji}`).join("")}\nThink you can beat me? Play the same seed!\n${url}`;
 }

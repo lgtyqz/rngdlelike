@@ -38,3 +38,7 @@ export const utcDate = (date = new Date()) => date.toISOString().slice(0, 10);
 /** Returns the published seed for a UTC date, or its deterministic fallback. */
 export const dailySeed = (date, calendar) =>
   calendar[date] ?? hash(`rngdlelike:daily:v1:${date}`);
+
+/** Finds the published UTC day associated with a seed, if any. */
+export const dailyDateForSeed = (seed, calendar) =>
+  Object.keys(calendar).sort().find((date) => calendar[date] === seed) ?? null;
