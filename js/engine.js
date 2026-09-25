@@ -10,6 +10,7 @@ import { hash, random, dailyDateForSeed } from "./random.js";
 import { scoreTrinket, isDigit, has, reelValue } from "./scoring.js";
 export { scoreTrinket } from "./scoring.js";
 export const TOTAL_SPINS = 20;
+export const TOOL_CHANCE = 0.6;
 /** Returns the point target for a given round. */
 export const goalFor = (round) => 10 + round * (round - 1) * 5;
 /** Returns the cash bonus awarded for meeting a round's point target. */
@@ -30,6 +31,14 @@ const shopBoost = (state) =>
   1.25 ** count(state, "mining") * 1.5 ** count(state, "magnifier");
 const toolPrice = (state, def) =>
   Math.ceil(itemPrice(def) * 1.4 * (has(state, "wrench") ? 0.5 : 1));
+const upgradePrice = (state, def, owned) => {
+  const multiplier = def.rarity === "legendary" ? 1.5 : 0.5;
+  return Math.ceil(
+    (Math.ceil(itemPrice(def) * multiplier) +
+      (owned.maxUses - def.maxUses) * 3) *
+      (has(state, "screwdriver") ? 0.5 : 1),
+  );
+};
 
 /**
  * Creates a new game state for a normal, daily, or shared-seed run.
@@ -161,13 +170,35 @@ function countDownBomb(state, index, position) {
   }
 }
 
+function countDownBombCopy(state, index, count) {
+  state.reels[index] = count === 1 ? null : `bomb:${count - 1}`;
+  recordBombEvent(
+    state,
+    index,
+    count === 1 ? "Bomb copy cleared" : `Bomb copy \n ${count - 1} left`,
+  );
+}
+
 function land(state, index, rng) {
   const pool = state.reelPools[index];
   const locked = state.locks[index];
   if (locked != null) {
-    state.reels[index] = locked;
-    state.positions[index] = pool.findIndex((slot) => slot === locked);
-    state.qubits[index] = false;
+    const position = state.positions[index];
+    if (position < 0 || position >= pool.length)
+      state.positions[index] = pool.findIndex((slot) => slot === locked);
+    const bombCount =
+      typeof locked === "string" && /^bomb:[1-3]$/.test(locked)
+        ? Number(locked.slice(5))
+        : null;
+    if (bombCount !== null) {
+      const slot = pool[state.positions[index]];
+      if (slot?.type === "bomb")
+        countDownBomb(state, index, state.positions[index]);
+      else countDownBombCopy(state, index, bombCount);
+    } else {
+      state.reels[index] = locked;
+      state.qubits[index] = locked === "qubit";
+    }
     return;
   }
   const choices = pool.map((slot, i) => ({ slot, i }));
@@ -319,14 +350,32 @@ export function useTool(state, id, target, source = null) {
   if (id === "decrement" && !isDigit(old) && bombCount === null) return false;
   if (["increment", "double", "flip", "pill"].includes(id) && !isDigit(old))
     return false;
-  if (id === "lock" && !isDigit(old)) return false;
+  if (id === "lock" && old == null) return false;
   switch (id) {
     case "incrementall":
-    case "decrementall":
       seenIndices = [];
       state.reels.forEach((value, i) => {
         if (!isDigit(value)) return;
         state.reels[i] = (value + (id === "incrementall" ? 1 : 9)) % 10;
+        state.qubits[i] = false;
+        seenIndices.push(i);
+      });
+      break;
+    case "decrementall":
+      seenIndices = [];
+      state.reels.forEach((value, i) => {
+        const count =
+          typeof value === "string" && /^bomb:[1-3]$/.test(value)
+            ? Number(value.slice(5))
+            : null;
+        if (count !== null) {
+          const position = state.positions[i];
+          const slot = state.reelPools[i]?.[position];
+          if (slot?.type === "bomb" && slot.count === count) {
+            countDownBomb(state, i, position);
+          } else countDownBombCopy(state, i, count);
+        } else if (isDigit(value)) state.reels[i] = (value + 9) % 10;
+        else return;
         state.qubits[i] = false;
         seenIndices.push(i);
       });
@@ -355,17 +404,7 @@ export function useTool(state, id, target, source = null) {
         const slot = pool?.[position];
         if (slot?.type === "bomb" && slot.count === bombCount)
           countDownBomb(state, target, position);
-        else {
-          state.reels[target] =
-            bombCount === 1 ? null : `bomb:${bombCount - 1}`;
-          recordBombEvent(
-            state,
-            target,
-            bombCount === 1
-              ? "Bomb copy cleared"
-              : `Bomb copy \n ${bombCount - 1} left`,
-          );
-        }
+        else countDownBombCopy(state, target, bombCount);
       } else state.reels[target] = (old + 9) % 10;
       break;
     case "double":
@@ -431,8 +470,10 @@ export function useTool(state, id, target, source = null) {
       break;
     case "atm": {
       const other = state.tools.find((t) => t.id === target);
-      if (!other || other === tool || state.bank < 30) return false;
-      state.bank -= 30;
+      if (!other || other === tool || other.id === "atm") return false;
+      const cost = ITEMS[other.id].rarity === "legendary" ? 150 : 15;
+      if (state.bank < cost) return false;
+      state.bank -= cost;
       other.uses++;
       other.bonusUses = (other.bonusUses ?? 0) + 1;
       break;
@@ -534,13 +575,11 @@ export function useTool(state, id, target, source = null) {
 }
 
 function randomTrinket(state, rarities = null) {
-  const def =
-    choose(
-      availableTrinkets.filter(
-        (t) => !has(state, t.id) && (!rarities || rarities.includes(t.rarity)),
-      ),
-      effectRng(state, "reward"),
-    ) ?? ITEMS.bug;
+  const pool = availableTrinkets.filter(
+    (t) => !has(state, t.id) && (!rarities || rarities.includes(t.rarity)),
+  );
+  const rng = effectRng(state, "reward");
+  const def = pool[Math.floor(rng() * pool.length)] ?? ITEMS.bug;
   if (def) acquire(state, def.id);
   return def;
 }
@@ -582,16 +621,22 @@ function acquire(state, id) {
   const def = ITEMS[id],
     item = ownItem(id);
   state[def.kind === "tool" ? "tools" : "trinkets"].push(item);
+  onAcquire(state, item);
+  return item;
+}
+
+function onAcquire(state, item, copied = false) {
+  const id = item.id,
+    def = ITEMS[id];
   if (id === "package") openPackage(state);
   if (["test-tube", "alembic"].includes(id)) experiment(state, item);
-  if (id === "moai")
+  if (id === "moai" && !copied)
     item.metadata.favorite = Math.floor(effectRng(state, "moai")() * 10);
   if (id === "cartwheel")
     for (const t of state.tools.filter((t) => REROLLS.includes(t.id)))
       t.uses += 3;
   if (def.kind === "tool" && REROLLS.includes(id) && has(state, "cartwheel"))
     item.uses += 5;
-  return item;
 }
 
 function activate(state, item) {
@@ -694,18 +739,18 @@ export function settleSpin(state) {
   }
   const bonus =
     points >= goalFor(state.round)
-      ? bonusFor(state.round) * 2 ** state.reels.filter((n) => n === "W").length
+      ? bonusFor(state.round) + 50 * state.reels.filter((n) => n === "W").length
       : 0;
   let runningBonus = points >= goalFor(state.round) ? bonusFor(state.round) : 0;
   state.reels.forEach((value, index) => {
     if (value !== "W") return;
-    const extra = runningBonus;
-    runningBonus += 75;
+    const extra = points >= goalFor(state.round) ? 50 : 0;
+    runningBonus += extra;
     state.events.push({
       id: "w",
       points: 0,
       cash: extra,
-      note: extra ? "Goal bonus increased by $75" : "No goal bonus to double",
+      note: extra ? "Goal bonus increased by $75" : "No goal bonus this spin",
       reels: [index],
       bonusTotal: runningBonus,
       steps: [],
@@ -799,46 +844,45 @@ export function generateOffers(state) {
         : { kind: "trinket", empty: true },
     );
   }
-  for (let slot = 0; slot < 1 + count(state, "hammer"); slot++) {
-    const upgrade = chooseUpgrade(
-      state.tools,
+  const percentToolsNotOwned =
+    TOOLS.filter((t) => !owned.has(t.id)).length / TOOLS.length;
+  if (rng() < TOOL_CHANCE * percentToolsNotOwned) {
+    const def = choose(
+      TOOLS.filter((t) => !owned.has(t.id)),
       rng,
-      boost * 4 ** count(state, "mechanical-arm"),
+      boost * 1.5 ** count(state, "graduate"),
     );
-    const upgradeDef = upgrade && ITEMS[upgrade.id];
     offers.push(
-      upgrade
+      def
         ? {
-            id: upgrade.id,
-            kind: "upgrade",
-            rarity: upgradeDef.rarity,
-            amount: 1,
-            price: Math.ceil(
-              (Math.ceil(itemPrice(upgradeDef) * 0.5) +
-                (upgrade.maxUses - ITEMS[upgrade.id].maxUses) * 3) *
-                (has(state, "screwdriver") ? 0.5 : 1),
-            ),
+            id: def.id,
+            kind: "tool",
+            rarity: def.rarity,
+            price: toolPrice(state, def),
             sold: false,
           }
-        : { kind: "upgrade", empty: true },
+        : { kind: "tool", empty: true },
+    );
+  } else {
+    const def = choose(
+      availableTrinkets.filter(
+        (t) => !owned.has(t.id) && !offers.some((o) => o.id === t.id),
+      ),
+      rng,
+      boost,
+    );
+    offers.push(
+      def
+        ? {
+            id: def.id,
+            kind: "trinket",
+            rarity: def.rarity,
+            price: itemPrice(def),
+            sold: false,
+          }
+        : { kind: "trinket", empty: true },
     );
   }
-  const def = choose(
-    TOOLS.filter((t) => !owned.has(t.id)),
-    rng,
-    boost * 1.5 ** count(state, "graduate"),
-  );
-  offers.push(
-    def
-      ? {
-          id: def.id,
-          kind: "tool",
-          rarity: def.rarity,
-          price: toolPrice(state, def),
-          sold: false,
-        }
-      : { kind: "tool", empty: true },
-  );
   for (let slot = 0; slot < count(state, "printer"); slot++) {
     const pool = state.trinkets.filter(
       (t) => t.id !== "bug" && t.id !== "printer",
@@ -853,6 +897,26 @@ export function generateOffers(state) {
         sold: false,
         copy: structuredClone(original),
       });
+  }
+  for (let slot = 0; slot < 1 + count(state, "hammer"); slot++) {
+    const upgrade = chooseUpgrade(
+      state.tools,
+      rng,
+      boost * 4 ** count(state, "mechanical-arm"),
+    );
+    const upgradeDef = upgrade && ITEMS[upgrade.id];
+    offers.push(
+      upgrade
+        ? {
+            id: upgrade.id,
+            kind: "upgrade",
+            rarity: upgradeDef.rarity,
+            amount: 1,
+            price: upgradePrice(state, upgradeDef, upgrade),
+            sold: false,
+          }
+        : { kind: "upgrade", empty: true },
+    );
   }
   return offers;
 }
@@ -915,8 +979,11 @@ export function buy(state, index) {
     if (!tool) return false;
     tool.maxUses += 1;
     tool.uses += 1;
-  } else if (offer.copy) state.trinkets.push(structuredClone(offer.copy));
-  else acquire(state, offer.id);
+  } else if (offer.copy) {
+    const copy = structuredClone(offer.copy);
+    state.trinkets.push(copy);
+    onAcquire(state, copy, true);
+  } else acquire(state, offer.id);
   state.bank -= offer.price;
   offer.sold = true;
   // Discounts purchased in this shop apply to its remaining offers immediately.
@@ -925,12 +992,7 @@ export function buy(state, index) {
     if (entry.kind === "tool") entry.price = toolPrice(state, def);
     if (entry.kind === "upgrade") {
       const owned = state.tools.find((t) => t.id === entry.id);
-      if (owned)
-        entry.price = Math.ceil(
-          (Math.ceil(itemPrice(def) * 0.5) +
-            (owned.maxUses - def.maxUses) * 3) *
-            (has(state, "screwdriver") ? 0.5 : 1),
-        );
+      if (owned) entry.price = upgradePrice(state, def, owned);
     }
   }
   return true;

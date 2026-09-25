@@ -18,7 +18,7 @@ soap,Soap,soap,"Remove a slot from a reel, permanently.",1,Uncommon,TRUE
 pill,Pill,pill,Permanently increase a number on a reel.,1,Common,TRUE
 mirror,Mirror,mirror,Permanently clone a number on a reel.,1,Rare,TRUE
 atm,ATM,atm,Spend $30 to give another tool one more use this spin.,1,Legendary,
-lock,Lock,lock,Fix a reel at its current number for the next spin.,1,Uncommon,
+lock,Lock,lock,Fix a reel at its current value for the next spin.,1,Uncommon,
 qubit,Superposition,trident,"Permanently replace a slot on a reel with a Superposition, which lets you choose between whether it's a zero or a one.",2,Rare,TRUE
 butterfly,Butterfly,butterfly,Permanently change a trinket into another of the same rarity.,1,Legendary,
 sparkles,Sparkles,sparkles,Permanently change a trinket into another with one higher rarity.,1,Rare,TRUE
