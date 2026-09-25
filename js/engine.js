@@ -840,7 +840,9 @@ export function generateOffers(state) {
       : { kind: "tool", empty: true },
   );
   for (let slot = 0; slot < count(state, "printer"); slot++) {
-    const pool = state.trinkets.filter((t) => t.id !== "bug");
+    const pool = state.trinkets.filter(
+      (t) => t.id !== "bug" && t.id !== "printer",
+    );
     const original = pool[Math.floor(rng() * pool.length)];
     if (original)
       offers.push({
@@ -920,8 +922,7 @@ export function buy(state, index) {
   // Discounts purchased in this shop apply to its remaining offers immediately.
   for (const entry of state.offers.filter((o) => !o.empty && !o.sold)) {
     const def = ITEMS[entry.id];
-    if (entry.kind === "tool")
-      entry.price = toolPrice(state, def);
+    if (entry.kind === "tool") entry.price = toolPrice(state, def);
     if (entry.kind === "upgrade") {
       const owned = state.tools.find((t) => t.id === entry.id);
       if (owned)

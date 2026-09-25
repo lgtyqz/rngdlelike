@@ -700,7 +700,7 @@ export const TRINKETS = [
     rarity: "legendary",
     effect: "printer",
     description:
-      "Every shop adds a copy of one of your trinkets at double price for sale.",
+      "Every shop adds a copy of one of your trinkets at double price for sale (can't print printers though!).",
     kind: "trinket",
     metadata: {},
   },
