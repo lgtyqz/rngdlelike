@@ -1238,6 +1238,12 @@ dialog form {
   color: #405be3;
   text-underline-offset: 3px;
 }
+#changelog summary {
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
 @keyframes info-dialog-in {
   from {
     opacity: 0;
