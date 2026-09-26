@@ -7,6 +7,7 @@ import {
 } from "./items.js";
 import {
   createRun,
+  syncTrinkets,
   chooseQubit,
   reelLabel,
   spin,
@@ -15,6 +16,7 @@ import {
   enterShop,
   buy,
   rerollShop,
+  refreshShopOffers,
   nextRound,
   goalFor,
   bonusFor,
@@ -26,6 +28,7 @@ import { dailySeed, dailyDateForSeed, utcDate, parseSeed } from "./random.js";
 
 import { BackgroundMusic, GameAudio } from "./audio.js";
 import { animateCount } from "./animation.js";
+import { divisibilityStatus } from "./scoring.js";
 
 const sound = new GameAudio();
 const recordPlayer = document.querySelector("#record-player");
@@ -89,7 +92,9 @@ let state = null,
   calendar = {},
   saved = readSave(),
   scoreWait;
+/** Returns the number of Package activations for sound deduplication. */
 const packageActivations = () => state?.packageActivations ?? 0;
+/** Plays the Package cue when an action activated its effect. */
 const playPackageSound = (before) => {
   if (packageActivations() > before) sound.play("package");
 };
@@ -124,19 +129,25 @@ const REEL_ICONS = {
   qubit: "openmoji-svg-color/1F531.svg",
   lock: "openmoji-svg-color/1F512.svg",
 };
+/** Builds decorative markup for a special reel symbol. */
 const reelIcon = (name, className) =>
   '<img class="' + className + '" src="' + REEL_ICONS[name] + '" alt="">';
+/** Recognizes a displayed bomb countdown. */
 const isBomb = (value) =>
   typeof value === "string" && value.startsWith("bomb:");
+/** Checks pending, active, and currently animating reel locks. */
 const isReelLocked = (index) =>
   state.nextLocks[index] != null ||
   state.locks[index] != null ||
   ui.spinningLocks?.[index] != null;
+/** Builds the main face of a displayed reel value. */
 const reelFace = (value) =>
   value === "qubit" ? reelIcon("qubit", "reel-symbol") : esc(reelLabel(value));
+/** Adds bomb and lock badges to a reel face. */
 const reelDecorations = (value, index) =>
   (isBomb(value) ? reelIcon("bomb", "reel-bomb-icon") : "") +
   (isReelLocked(index) ? reelIcon("lock", "reel-lock-icon") : "");
+/** Builds a permanent slot preview for the reel tooltip. */
 const poolSlotFace = (slot) =>
   typeof slot === "object"
     ? reelIcon("bomb", "reel-pool-icon") + slot.count
@@ -311,12 +322,25 @@ function readSave() {
       !Number.isInteger(data.legendaryShops)
     )
       return null;
+    if (
+      data.shopRngState != null &&
+      (!Number.isInteger(data.shopRngState) ||
+        data.shopRngState < 0 ||
+        data.shopRngState > 0xffffffff)
+    )
+      return null;
     if (data.mode === "daily" && !validDate(data.date)) return null;
     for (const offer of data.offers) {
       if (!offer.empty && offer.kind === "upgrade") {
         offer.amount = 1;
         offer.rarity = ITEMS[offer.id].rarity;
       }
+    }
+    syncTrinkets(data);
+    // Migrate saves made with the obsolete purchase-only shop snapshot.
+    if (data.shopInventory) {
+      delete data.shopInventory;
+      if (data.phase === "shop") refreshShopOffers(data);
     }
     return data;
   } catch {
@@ -452,7 +476,9 @@ function stats() {
     scoring = current === "scoring";
   const points = scoring ? ui.displayPoints : state.points;
   const bank = scoring ? ui.displayBank : state.bank;
-  const total = scoring ? ui.displayTotal : state.total;
+  const total = scoring
+    ? ui.displayTotal
+    : state.total + (state.phase === "editing" ? state.points : 0);
   const bonus =
     current === "scored"
       ? state.points >= goalFor(state.round)
@@ -506,6 +532,16 @@ function inventory() {
     .map((kind) => {
       const items = state[kind]
         .map((item, index) => {
+          if (
+            kind === "trinkets" &&
+            state.trinkets.findIndex((t) => t.id === item.id) !== index
+          )
+            return "";
+          const copies =
+            kind === "trinkets"
+              ? state.trinkets.filter((t) => t.id === item.id).length
+              : 1;
+          const name = `${ITEMS[item.id].name}${copies > 1 ? ` x${copies}` : ""}`;
           const def = ITEMS[item.id],
             isTool = kind === "tools",
             editing = phase() === "editing";
@@ -524,11 +560,11 @@ function inventory() {
               data-item="${item.id}"
               data-inventory-index="${index}"
               data-action="${isTool ? "tool" : "inspect"}"
-              aria-label="${esc(def.name)}. ${esc(itemDescription(item))}${usesLabel}"
+              aria-label="${esc(name)}. ${esc(itemDescription(item))}${usesLabel}"
               ${pressedAttribute}
             >
               <img src="${iconPath(item.id)}" alt="" width="70" height="70">
-              <span class="item-name">${esc(def.name)}</span>
+              <span class="item-name">${esc(name)}</span>
               ${
                 isTool && editing
                   ? `
@@ -674,7 +710,7 @@ function offers(animateSpawn = false) {
 
 /** Returns one scoring-event row for the animated score log. */
 function logRow(event, pending = false) {
-  const isCashBonus = event.id === "w";
+  const isCashBonus = ["w", "octopus"].includes(event.id);
   const isMessageEvent = Boolean(event.message);
   return `
     <div class="log-row ${event.points || event.multiplier > 1 || isCashBonus || isMessageEvent ? "" : "missed"}">
@@ -686,7 +722,7 @@ function logRow(event, pending = false) {
         ${
           isMessageEvent
             ? `<span class="log-message">${esc(event.message)}</span>`
-            : `+${isCashBonus ? "$" : ""}<span class="log-points">${number(pending ? 0 : isCashBonus ? event.cash : event.points)}</span>`
+            : `+${isCashBonus ? "$" : ""}<span class="log-points">${number(pending ? (event.previewPoints ?? 0) : isCashBonus ? event.cash : event.points)}</span>`
         }
         ${event.note ? `<small class="log-note" ${pending ? "hidden" : ""}>${esc(event.note)}</small>` : ""}
       </div>
@@ -771,7 +807,13 @@ function renderGame({ animateOffers = false } = {}) {
       `;
       action = button(
         current === "ready" ? "spin" : "score",
-        ui.busy ? "SPINNING…" : current === "ready" ? "SPIN!" : "GET POINTS!",
+        ui.busy
+          ? ui.cameraAnimating
+            ? "ACTIVATING…"
+            : "SPINNING…"
+          : current === "ready"
+            ? "SPIN!"
+            : "GET POINTS!",
       );
     }
   }
@@ -828,6 +870,18 @@ function render({ focus = false, animate = true, animateOffers = false } = {}) {
   for (const [id, left] of Object.entries(scrolls)) {
     const bin = document.getElementById(id);
     if (bin) bin.scrollTo({ left, behavior: "instant" });
+  }
+  if (state?.revealTrinket && !ui.menu) {
+    const item = document.querySelector(
+      `#trinkets-bin [data-item="${state.revealTrinket}"]`,
+    );
+    item?.scrollIntoView({
+      block: "nearest",
+      inline: "center",
+      behavior: reducedMotion.matches ? "instant" : "smooth",
+    });
+    item?.classList.add("new-item");
+    delete state.revealTrinket;
   }
   if (focus)
     app
@@ -906,6 +960,7 @@ async function animateReel(node, finalDigit, index, quick = false) {
     ],
     { duration, easing: "cubic-bezier(.12,.6,.23,1)", fill: "forwards" },
   );
+  /** Updates the animated reel color as its visible digit advances. */
   function colorTick() {
     const offset = Math.abs(
       new DOMMatrixReadOnly(getComputedStyle(strip).transform).m42,
@@ -939,6 +994,7 @@ async function animateReel(node, finalDigit, index, quick = false) {
 
 /** Displays bomb, sight-counter, and cash events over the reels that caused them. */
 function showReelNotifications() {
+  /** Displays a temporary accessible notification over the specified reel. */
   const show = (index, message, kind) => {
     const shell = document.querySelectorAll(".reel-shell")[index];
     if (!shell) return;
@@ -952,6 +1008,11 @@ function showReelNotifications() {
     shell.append(toast);
     setTimeout(() => toast.remove(), reducedMotion.matches ? 2300 : 1900);
   };
+  if (state.reelError) {
+    show(state.reelError.index, state.reelError.message, "seen");
+    state.reelError = null;
+    return;
+  }
   for (const event of state.bombEvents ?? [])
     show(event.reels[0], event.message, "bomb");
   for (const event of state.seenEvents ?? []) {
@@ -1015,8 +1076,8 @@ function waitForScore(ms) {
 /** Settles the current spin and animates each trinket's scoring event. */
 async function doScore() {
   if (ui.busy || state.phase !== "editing") return;
-  ui.displayPoints = 0;
-  ui.displayTotal = state.total;
+  ui.displayPoints = state.points;
+  ui.displayTotal = state.total + state.points;
   ui.displayBank = state.bank;
   const packageCount = packageActivations();
   if (!settleSpin(state)) return;
@@ -1037,6 +1098,7 @@ async function doScore() {
   const subtitle = document.querySelector("#bonus-message");
   const goal = goalFor(state.round);
   let goalReached = ui.displayPoints >= goal;
+  /** Checks whether scoring animation should finish immediately. */
   const instant = () => reducedMotion.matches || ui.fast || document.hidden;
   for (const event of state.events) {
     ui.logs.push(event);
@@ -1047,13 +1109,13 @@ async function doScore() {
     const ledger = row.querySelector(".log-points");
     row.classList.add("scoring-active");
     log.scrollTop = log.scrollHeight;
-    if (event.id === "w" || event.message) {
+    if (["w", "octopus"].includes(event.id) || event.message) {
       for (const index of event.reels ?? [])
         if (!reducedMotion.matches)
           reelNodes[index].classList.add("scoring-hit");
-      if (event.id === "w") {
+      if (["w", "octopus"].includes(event.id)) {
         row.querySelector(".log-points").textContent = number(event.cash);
-        if (event.cash)
+        if (event.id === "w" && event.cash)
           subtitle.textContent = `goal bonus: +$${number(event.bonusTotal)}!`;
       }
       await waitForScore(350);
@@ -1063,11 +1125,18 @@ async function doScore() {
       row.classList.remove("scoring-active");
       continue;
     }
-    let subtotal = 0;
+    let subtotal = event.previewPoints ?? 0;
     // Older saves can still display aggregate events without contribution data.
     const steps =
-      event.steps ??
-      (event.points ? [{ reels: [], points: event.points }] : []);
+      event.previewPoints != null
+        ? [
+            {
+              reels: event.reels ?? [],
+              points: event.points - event.previewPoints,
+            },
+          ].filter((step) => step.points !== 0)
+        : (event.steps ??
+          (event.points ? [{ reels: [], points: event.points }] : []));
     for (const step of steps) {
       const note = row.querySelector(".log-note");
       if (step.note && note) {
@@ -1088,6 +1157,7 @@ async function doScore() {
         to: subtotal,
         duration: 420,
         instant,
+        /** Updates the visible ledger and totals for this animation frame. */
         update(value) {
           ledger.textContent = number(value);
           ui.displayPoints = pointsBefore + value - previous;
@@ -1174,6 +1244,7 @@ async function targetReel(index) {
   const packageCount = packageActivations();
   if (!useTool(state, id, index, ui.source)) {
     sound.play("error");
+    if (state.reelError) showReelNotifications();
     return;
   }
   playPackageSound(packageCount);
@@ -1198,26 +1269,133 @@ async function targetReel(index) {
   showReelNotifications();
 }
 
-function applyInventoryTool(id) {
+/** Animates Camera's visible counters and highlights changed inventory values. */
+async function animateCameraEffect(before) {
+  /** Skips interpolation when motion is reduced or the page is hidden. */
+  const instant = () => reducedMotion.matches || document.hidden;
+  const animations = [];
+  for (const [id, from, to, prefix] of [
+    ["points", before.points, state.points, ""],
+    ["total", before.total + before.points, state.total + state.points, ""],
+    ["bank", before.bank, state.bank, "$"],
+  ]) {
+    const node = document.getElementById(id);
+    if (!node || from === to) continue;
+    node.textContent = prefix + number(from);
+    node.classList.add("bank-bump");
+    animations.push(
+      animateCount({
+        from,
+        to,
+        duration: 650,
+        instant,
+        /** Keeps the affected counter in sync with its animated value. */
+        update(value) {
+          node.textContent = prefix + number(value);
+        },
+      }).then(() => node.classList.remove("bank-bump")),
+    );
+  }
+  for (const kind of ["trinkets", "tools"]) {
+    const seen = new Set();
+    for (const item of state[kind]) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      const previous = before[kind].find((entry) => entry.id === item.id);
+      const node = document.querySelector(
+        `#${kind}-bin [data-item="${item.id}"]`,
+      );
+      if (!node) continue;
+      const changes = [];
+      const activation = state.pendingEvents
+        .slice(before.pendingEvents.length)
+        .find((event) => event.id === item.id);
+      if (activation?.multiplier > 1)
+        changes.push(`×${activation.multiplier} round score`);
+      if (!previous) changes.push("Gained!");
+      else if (kind === "trinkets") {
+        for (const key of ["power", "count", "favorite"]) {
+          const value = item.metadata[key],
+            old = previous.metadata[key];
+          if (value != null && value !== old)
+            changes.push(`${key}: ${old ?? 0} → ${value}`);
+        }
+        const copies = state.trinkets.filter(
+          (entry) => entry.id === item.id,
+        ).length;
+        if (
+          copies >
+          before.trinkets.filter((entry) => entry.id === item.id).length
+        )
+          changes.push(`Copies: x${copies}`);
+      } else if (item.uses > previous.uses || item.maxUses > previous.maxUses) {
+        changes.push(`Uses: ${previous.uses} → ${item.uses}`);
+        const uses = node.querySelector(".uses");
+        if (uses)
+          animations.push(
+            animateCount({
+              from: previous.uses,
+              to: item.uses,
+              duration: 650,
+              instant,
+              /** Shows the upgraded use count as it increases. */
+              update(value) {
+                uses.textContent = number(value);
+              },
+            }),
+          );
+      }
+      if (!changes.length) continue;
+      const feedback = document.createElement("span");
+      feedback.className = "camera-feedback";
+      feedback.setAttribute("role", "status");
+      feedback.textContent = changes.join(" · ");
+      node.append(feedback);
+      node.classList.add("new-item");
+      setTimeout(() => feedback.remove(), 2400);
+    }
+  }
+  await Promise.all(animations);
+}
+
+/** Applies an inventory tool and immediately animates Camera's resulting effects. */
+async function applyInventoryTool(id) {
+  if (ui.busy) return;
+  const camera = ui.selected === "camera";
+  const before = camera ? structuredClone(state) : null;
   const packageCount = packageActivations();
   if (!useTool(state, ui.selected, id)) {
     sound.play("error");
     return;
   }
   playPackageSound(packageCount);
-  switch (ui.selected) {
-    case "camera":
-      sound.play("camera");
-      break;
-    case "atm":
-      sound.play("atm");
-      break;
-  }
+  if (camera) sound.play("camera");
+  else if (ui.selected === "atm") sound.play("atm");
+  else if (ui.selected === "mirror") sound.play("mirror");
   ui.selected = null;
   ui.source = null;
+  ui.busy = camera;
+  ui.cameraAnimating = camera;
   persist();
   render({ animate: false });
   showReelNotifications();
+  if (camera) {
+    try {
+      await animateCameraEffect(before);
+    } finally {
+      ui.busy = false;
+      ui.cameraAnimating = false;
+      const feedback = [...app.querySelectorAll(".camera-feedback")].map(
+        (node) => ({
+          node,
+          id: node.parentElement.dataset.item,
+        }),
+      );
+      render({ animate: false });
+      for (const { node, id } of feedback)
+        app.querySelector(`.item[data-item="${id}"]`)?.append(node);
+    }
+  }
 }
 
 /** Copies the run summary and challenge URL, with a dialog fallback. */
@@ -1309,17 +1487,28 @@ function inspect(element) {
         : `Permanently upgrade ${def.name}.\n${owned.maxUses} → ${owned.maxUses + offer.amount} uses per spin.`
       : itemDescription(owned);
   const rarity = offer?.rarity || def.rarity;
+  const divisibility = divisibilityStatus(id, state.reels);
   hideTooltip();
   tooltip.innerHTML = `
-    <strong>${esc(def.name)}</strong>
+    <strong>${esc(def.name)}${!offer && def.kind === "trinket" && state.trinkets.filter((t) => t.id === id).length > 1 ? ` x${state.trinkets.filter((t) => t.id === id).length}` : ""}</strong>
     <span class="rarity ${rarity}">
       ${RARITIES[rarity].label}${offer?.kind === "upgrade" ? " \n Tool upgrade" : ""}
     </span>
     <span class="tooltip-description">${esc(description)}</span>
+    ${
+      divisibility
+        ? `<span class="divisibility-status ${divisibility.triggers ? "will-trigger" : "will-not-trigger"}">
+      <strong>${divisibility.triggers ? "✓ Triggers on this board" : "Not triggering on this board"}</strong>
+      ${number(divisibility.value)} ÷ ${divisibility.divisor} · Remainder: ${divisibility.remainder}
+      ${divisibility.remainder ? `<span>${divisibility.divisor - divisibility.remainder} below the next multiple</span>` : ""}
+    </span>`
+        : ""
+    }
   `;
   positionTooltip(element);
 }
 
+/** Positions the tooltip by its trigger while keeping it inside the viewport. */
 function positionTooltip(element, trigger = element) {
   tooltip.hidden = false;
   trigger.setAttribute("aria-describedby", "tooltip");
@@ -1350,6 +1539,7 @@ function hideTooltip() {
     .forEach((el) => el.removeAttribute("aria-describedby"));
 }
 
+/** Animates an information dialog closed and restores normal page interaction. */
 function closeInfoDialog(dialog) {
   if (!dialog.open || dialog.classList.contains("closing")) return;
   if (reducedMotion.matches) {
@@ -1487,7 +1677,7 @@ app.addEventListener("click", async (event) => {
       break;
     case "tool": {
       if (ui.selected === "atm") {
-        applyInventoryTool(el.dataset.item);
+        await applyInventoryTool(el.dataset.item);
         break;
       }
       const tool = state.tools.find((t) => t.id === el.dataset.item);
@@ -1536,7 +1726,7 @@ app.addEventListener("click", async (event) => {
       break;
     case "inspect":
       if (ui.selected && ITEMS[ui.selected].target === "trinket") {
-        applyInventoryTool(Number(el.dataset.inventoryIndex));
+        await applyInventoryTool(Number(el.dataset.inventoryIndex));
         break;
       }
       inspect(el);
@@ -1567,9 +1757,7 @@ app.addEventListener("click", async (event) => {
           .querySelector(`[data-inventory-index="${i}"]`)
           ?.classList.add("new-item");
       const item = gainedTrinkets.length
-        ? bin.querySelector(
-            `[data-inventory-index="${state.trinkets.length - 1}"]`,
-          )
+        ? bin.querySelector(`[data-item="${gainedTrinkets.at(-1).id}"]`)
         : bin.querySelector(`[data-item="${offer.id}"]`);
       if (!item) break;
       item.classList.add("new-item");

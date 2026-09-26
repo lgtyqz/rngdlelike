@@ -3,6 +3,7 @@ const MUSIC_VOLUME_KEY = "rngdlelike.music-volume.v1";
 
 /** Controls the looping theme independently of the sound effect mixer. */
 export class BackgroundMusic {
+  /** Initializes audio playback state and restores saved preferences. */
   constructor(onChange = () => {}) {
     this.audio = new Audio(
       new URL("../assets/sounds/rngdlelike-theme.mp3", import.meta.url),
@@ -25,6 +26,7 @@ export class BackgroundMusic {
     this.audio.volume = 0;
   }
 
+  /** Clamps and saves the chosen music volume. */
   setVolume(value) {
     this.volume = Math.max(0, Math.min(1, Number(value) || 0));
     this.applyVolume();
@@ -33,6 +35,7 @@ export class BackgroundMusic {
     } catch {}
   }
 
+  /** Applies the current volume and fade level to the active audio output. */
   applyVolume() {
     const volume = this.volume * this.level;
     if (this.gain) this.gain.gain.value = volume;
@@ -41,7 +44,8 @@ export class BackgroundMusic {
 
   // Create the graph during a user gesture so mobile browsers can unlock it.
   prepareAudio() {
-    const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
+    const AudioContext =
+      globalThis.AudioContext || globalThis.webkitAudioContext;
     if (!this.context && AudioContext) {
       this.context = new AudioContext();
       this.gain = this.context.createGain();
@@ -55,6 +59,7 @@ export class BackgroundMusic {
       return this.context.resume();
   }
 
+  /** Animates the music gain to its target and calls the completion callback. */
   fade(to, duration, done = () => {}) {
     if (this.frame !== null) cancelAnimationFrame(this.frame);
     if (globalThis.document?.hidden) {
@@ -66,6 +71,7 @@ export class BackgroundMusic {
     }
     const from = this.level;
     const started = performance.now();
+    /** Advances the music fade and schedules another frame if needed. */
     const tick = (now) => {
       const progress = Math.min(1, (now - started) / duration);
       this.level = from + (to - from) * progress;
@@ -79,6 +85,7 @@ export class BackgroundMusic {
     this.frame = requestAnimationFrame(tick);
   }
 
+  /** Starts music after a user gesture and handles superseded playback requests. */
   async start() {
     if (this.playing) return;
     const request = ++this.request;
@@ -98,6 +105,7 @@ export class BackgroundMusic {
     }
   }
 
+  /** Fades out music and optionally resets its playback position. */
   stop(reset = false) {
     this.request++;
     if (!this.playing && this.audio.paused) {
@@ -113,6 +121,7 @@ export class BackgroundMusic {
     });
   }
 
+  /** Toggles playback or enabled state from the user control. */
   toggle() {
     if (this.playing) this.stop();
     else this.start();
@@ -140,10 +149,12 @@ export const SOUND_REGISTRY = {
   error: { src: "../assets/sounds/error.wav", volume: 0.8 },
   atm: { src: "../assets/sounds/atm.wav", volume: 0.8 },
   package: { src: "../assets/sounds/box.wav", volume: 0.8 },
+  mirror: { src: "../assets/sounds/mirror.wav", volume: 0.8 },
 };
 
 /** Owns a lazily unlocked audio context and the persistent sound preference. */
 export class GameAudio {
+  /** Initializes audio playback state and restores saved preferences. */
   constructor() {
     this.enabled = true;
     this.context = null;
@@ -178,6 +189,7 @@ export class GameAudio {
     }
   }
 
+  /** Toggles playback or enabled state from the user control. */
   toggle() {
     this.enabled = !this.enabled;
     if (!this.enabled) this.stop();
@@ -223,6 +235,7 @@ export class GameAudio {
     return this.buffers.get(name);
   }
 
+  /** Plays a decoded cue when sound is enabled, with stale-request and overlap guards. */
   async play(name) {
     if (name === "spin") this.scorePitch = 0;
     const context = this.context;

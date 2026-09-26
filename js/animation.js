@@ -14,6 +14,7 @@ export function animateCount({
 }) {
   return new Promise((resolve) => {
     const start = performance.now();
+    /** Advances the count animation and resolves when its destination is reached. */
     function frame(now) {
       const progress = instant() ? 1 : Math.min(1, (now - start) / duration);
       update(countValue(from, to, progress));

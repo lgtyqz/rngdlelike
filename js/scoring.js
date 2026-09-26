@@ -1,12 +1,24 @@
 import { ITEMS } from "./items.js";
 
+/** Checks whether a reel value is an ordinary digit from zero through nine. */
 export const isDigit = (n) => Number.isInteger(n) && n >= 0 && n <= 9;
+/** Converts a bomb face to its countdown digit for scoring and sightings. */
 export const reelValue = (value) =>
   typeof value === "string" && /^bomb:[1-3]$/.test(value)
     ? Number(value.slice(5))
     : value;
+/** Reports whether at least one copy of a trinket is owned. */
 export const has = (state, id) =>
   state?.trinkets.some((t) => t.id === id) ?? false;
+
+/** Reports divisibility using the same digit extraction as scoring, including bomb digits. */
+export function divisibilityStatus(id, reels) {
+  const divisor = { rabbit: 7, heaven: 11, three: 3, fiver: 5 }[id];
+  if (!divisor) return null;
+  const value = Number(reels.map(reelValue).filter(isDigit).join(""));
+  const remainder = value % divisor;
+  return { value, divisor, remainder, triggers: remainder === 0 };
+}
 
 // Contributions retain reel indices so the scoring animation reflects the actual rule.
 export function scoreTrinket(item, reels, state = null) {
@@ -18,28 +30,32 @@ export function scoreTrinket(item, reels, state = null) {
     all = reels.map((_, i) => i);
   const digits = reels.filter(isDigit),
     sum = digits.reduce((a, b) => a + b, 0);
-  const value = Number(digits.join(""));
   const counts = Array.from(
     { length: 10 },
     (_, n) => reels.filter((d) => d === n).length,
   );
-  const eight = has(state, "eightball") ? 2 : 1;
+  const eight =
+    2 ** (state?.trinkets.filter((t) => t.id === "eightball").length ?? 0);
   let cash = 0,
     multiplier = 1,
     note = "";
+  /** Records a scoring contribution, repeating eight-related hits for each Eight Ball multiplier. */
   const add = (indices, points, repeat = true) => {
     if (points > 0) {
       steps.push({ reels: indices, points });
-      if (repeat && indices.some((i) => reels[i] === 8) && eight === 2)
-        steps.push({ reels: indices, points });
+      if (repeat && indices.some((i) => reels[i] === 8) && eight > 1)
+        for (let hit = 1; hit < eight; hit++)
+          steps.push({ reels: indices, points });
     }
   };
+  /** Scores each matching digit with the applicable eight-related repetition. */
   const each = (predicate, fn) =>
     reels.forEach((n, i) => {
       if (!isDigit(n) || !predicate(n)) return;
       for (let hit = 0; hit < (n === 8 ? eight : 1); hit++)
         add([i], typeof fn === "function" ? fn(n) : fn, false);
     });
+  /** Adds a board-wide contribution when its condition holds. */
   const flat = (condition, points) => {
     if (condition) add(all, points, false);
   };
@@ -105,7 +121,7 @@ export function scoreTrinket(item, reels, state = null) {
       each((n) => n % 2 === 1, 4);
       break;
     case "high":
-      each((n) => n >= 5, 3);
+      each((n) => n > 6, 6);
       break;
     case "low":
       each((n) => n < 4, 6);
@@ -161,16 +177,17 @@ export function scoreTrinket(item, reels, state = null) {
       );
       break;
     case "seven":
+      // Pay for final-board sevens on each activation, without accumulating power.
+      cash = counts[7] * 7;
+      break;
     case "hotface":
     case "coldface": {
-      const amount = id === "seven" ? 7 : 2;
+      const amount = 4;
       each(
         (n) =>
-          id === "seven"
-            ? n === 7
-            : id === "hotface"
-              ? [8, 9, 0, 1, 2].includes(n)
-              : [3, 4, 5, 6, 7].includes(n),
+          id === "hotface"
+            ? [8, 9, 0, 1, 2].includes(n)
+            : [3, 4, 5, 6, 7].includes(n),
         () => {
           item.metadata.power += amount;
           return 0;
@@ -198,7 +215,7 @@ export function scoreTrinket(item, reels, state = null) {
       for (let n = 0; n < 10; n++) {
         const indices = all.filter((i) => reels[i] === n);
         for (let i = 0; i + 2 < indices.length; i += 3)
-          add(indices.slice(i, i + 3), 100);
+          add(indices.slice(i, i + 3), 150);
       }
       break;
     case "miniflush":
@@ -225,7 +242,7 @@ export function scoreTrinket(item, reels, state = null) {
       reels.forEach((n, i) => {
         if (n === 0 || n === 1) {
           add([i], 42);
-          cash += 10;
+          cash += 24;
         }
       });
       break;
@@ -289,10 +306,9 @@ export function scoreTrinket(item, reels, state = null) {
     case "heaven":
     case "three": {
       add([], item.metadata.power, false);
-      const divisor = { rabbit: 7, heaven: 11, three: 3 }[id];
-      if (value % divisor === 0) {
+      if (divisibilityStatus(id, reels).triggers) {
         if (id === "heaven") item.metadata.power *= 2;
-        else item.metadata.power += id === "rabbit" ? 177 : 13;
+        else item.metadata.power += id === "rabbit" ? 77 : 13;
       }
       break;
     }
@@ -300,7 +316,7 @@ export function scoreTrinket(item, reels, state = null) {
       if (!counts[4] && counts[8]) multiplier = 2;
       break;
     case "fiver":
-      flat(value % 5 === 0, 25);
+      flat(divisibilityStatus(id, reels).triggers, 25);
       break;
     case "monocle":
       flat(new Set(reels).size === 1, 1000);
@@ -310,7 +326,7 @@ export function scoreTrinket(item, reels, state = null) {
         reels.every(isDigit) &&
           (reels.every((n, i) => i === 0 || n > reels[i - 1]) ||
             reels.every((n, i) => i === 0 || n < reels[i - 1])),
-        100,
+        456,
       );
       break;
     case "moai": {
@@ -341,7 +357,7 @@ export function scoreTrinket(item, reels, state = null) {
         multiplier = 2;
       break;
     case "dragon":
-      add([], 4 * (state?.trinkets.length ?? 1), false);
+      add([], 50 * (state?.trinkets.length ?? 1), false);
       break;
     case "pairofeyes":
       if (
@@ -372,7 +388,8 @@ export function scoreTrinket(item, reels, state = null) {
     default:
       throw new Error(`Missing trinket effect: ${id}`);
   }
-  if (item.metadata.power != null) note = `Power: ${item.metadata.power}`;
+  if (id !== "seven" && item.metadata.power != null)
+    note = `Power: ${item.metadata.power}`;
   if (cash) note += `${note ? ": " : ""}+$${cash}`;
   if (multiplier > 1) note += `${note ? ": " : ""}×${multiplier} round score`;
   return {
