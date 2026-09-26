@@ -1,4 +1,11 @@
 import { ITEMS } from "./items.js";
+import { hash, random } from "./random.js";
+
+/** Each copy independently reduces the chance of no double trigger by 68%. */
+export const eightBallHits = (state, rng) => {
+  const copies = state?.trinkets.filter((t) => t.id === "eightball").length ?? 0;
+  return 1 + Number(rng() < 1 - 0.32 ** copies);
+};
 
 /** Checks whether a reel value is an ordinary digit from zero through nine. */
 export const isDigit = (n) => Number.isInteger(n) && n >= 0 && n <= 9;
@@ -34,8 +41,8 @@ export function scoreTrinket(item, reels, state = null) {
     { length: 10 },
     (_, n) => reels.filter((d) => d === n).length,
   );
-  const eight =
-    2 ** (state?.trinkets.filter((t) => t.id === "eightball").length ?? 0);
+  const eightRng = random(hash(`${state?.seed ?? 0}:eightball-score:${state?.round ?? 0}:${id}:${JSON.stringify(reels)}`));
+  const eight = () => eightBallHits(state, eightRng);
   let cash = 0,
     multiplier = 1,
     note = "";
@@ -43,8 +50,8 @@ export function scoreTrinket(item, reels, state = null) {
   const add = (indices, points, repeat = true) => {
     if (points > 0) {
       steps.push({ reels: indices, points });
-      if (repeat && indices.some((i) => reels[i] === 8) && eight > 1)
-        for (let hit = 1; hit < eight; hit++)
+      if (repeat && indices.some((i) => reels[i] === 8))
+        for (let hit = 1, hits = eight(); hit < hits; hit++)
           steps.push({ reels: indices, points });
     }
   };
@@ -52,7 +59,7 @@ export function scoreTrinket(item, reels, state = null) {
   const each = (predicate, fn) =>
     reels.forEach((n, i) => {
       if (!isDigit(n) || !predicate(n)) return;
-      for (let hit = 0; hit < (n === 8 ? eight : 1); hit++)
+      for (let hit = 0, hits = n === 8 ? eight() : 1; hit < hits; hit++)
         add([i], typeof fn === "function" ? fn(n) : fn, false);
     });
   /** Adds a board-wide contribution when its condition holds. */
@@ -289,7 +296,7 @@ export function scoreTrinket(item, reels, state = null) {
         reels.at(-1) < reels[0]
       ) {
         add([0, reels.length - 1], 40);
-        cash = 20 * (reels[0] === 8 || reels.at(-1) === 8 ? eight : 1);
+        cash = 20 * (reels[0] === 8 || reels.at(-1) === 8 ? eight() : 1);
       }
       break;
     case "bullmaket":
@@ -299,7 +306,7 @@ export function scoreTrinket(item, reels, state = null) {
         reels.at(-1) > reels[0]
       ) {
         add([0, reels.length - 1], 40);
-        cash = 20 * (reels[0] === 8 || reels.at(-1) === 8 ? eight : 1);
+        cash = 20 * (reels[0] === 8 || reels.at(-1) === 8 ? eight() : 1);
       }
       break;
     case "rabbit":
@@ -332,7 +339,7 @@ export function scoreTrinket(item, reels, state = null) {
     case "moai": {
       const favorite = item.metadata.favorite;
       for (const i of all.filter((index) => reels[index] === favorite))
-        for (let hit = 0; hit < (favorite === 8 ? eight : 1); hit++)
+        for (let hit = 0, hits = favorite === 8 ? eight() : 1; hit < hits; hit++)
           steps.push({ reels: [i], points: 0 });
       multiplier = 2 ** steps.length;
       steps.forEach((step, index) => {

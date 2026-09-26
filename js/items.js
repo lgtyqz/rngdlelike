@@ -263,7 +263,8 @@ export const TRINKETS = [
     emoji: "🎱",
     rarity: "rare",
     effect: "eightball",
-    description: "Trinkets activate on 8s twice.",
+    description:
+      "8s have a 68% chance to trigger twice. (Each additional Eight Ball reduces the chance of no extra trigger by 68%.)",
     kind: "trinket",
     metadata: {},
   },
@@ -528,7 +529,7 @@ export const TRINKETS = [
     rarity: "rare",
     effect: "package",
     description:
-      "Replace all your other trinkets with ones that are one rarity higher.",
+      "Score the password to transform ALL your trinkets, including this one, into random trinkets one rarity higher. Legendary trinkets transform into other unowned Legendaries.",
     kind: "trinket",
     metadata: {},
   },
@@ -676,7 +677,7 @@ export const TRINKETS = [
     id: "octopus",
     name: "Octopus",
     emoji: "🐙",
-    rarity: "rare",
+    rarity: "legendary",
     effect: "octopus",
     description:
       "When I see an 8, gain $8. Each eight 8s seen this round reduces this payout by $1, to a minimum of $0. Resets each round.",
@@ -1146,6 +1147,9 @@ export function itemDescription(owned) {
   const def = ITEMS[owned.id];
   return (
     def.description +
+    (owned.metadata?.password != null
+      ? ` Password: ${String(owned.metadata.password).padStart(6, "0")}.`
+      : "") +
     (owned.metadata?.favorite != null
       ? ` Favorite: ${owned.metadata.favorite}.`
       : "") +

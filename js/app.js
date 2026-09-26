@@ -1480,6 +1480,8 @@ function inspect(element) {
     element.dataset.offer != null
       ? state.offers[Number(element.dataset.offer)]
       : null;
+  if (id === "package" && state.packagePassword != null)
+    owned.metadata.password = Number(state.packagePassword);
   const description =
     offer?.kind === "upgrade"
       ? def.limitedUse

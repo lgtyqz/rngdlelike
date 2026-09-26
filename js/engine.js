@@ -7,7 +7,13 @@ import {
   itemPrice,
 } from "./items.js";
 import { hash, random, nextRandom, dailyDateForSeed } from "./random.js";
-import { scoreTrinket, isDigit, has, reelValue } from "./scoring.js";
+import {
+  scoreTrinket,
+  isDigit,
+  has,
+  reelValue,
+  eightBallHits,
+} from "./scoring.js";
 export { scoreTrinket } from "./scoring.js";
 export const TOTAL_SPINS = 20;
 export const TOOL_CHANCE = 0.6;
@@ -37,13 +43,25 @@ const toolPrice = (state, def) =>
 /** Prices an upgrade using rarity, exponential growth, and stacked discounts. */
 const upgradePrice = (state, def, owned) => {
   const multiplier = def.rarity === "legendary" ? 1.5 : 0.5;
-  const base = def.rarity === "legendary" ? 4 : 2;
+  const base = def.rarity === "legendary" ? 5 : 3;
   return Math.ceil(
     (Math.ceil(itemPrice(def) * multiplier) +
       base ** (owned.maxUses - def.maxUses)) *
       0.5 ** count(state, "screwdriver"),
   );
 };
+
+/** Keeps the Package password independent of purchases and effect rolls. */
+const packagePassword = (seed) =>
+  String(
+    Math.floor(random(hash(`${seed >>> 0}:package-password`))() * 1000000),
+  ).padStart(6, "0");
+
+/** Requires all six scored digits, preserving leading zeroes. */
+const packageMatches = (state) =>
+  state.reels.map(reelValue).every(isDigit) &&
+  state.reels.map(reelValue).join("") ===
+    (state.packagePassword ??= packagePassword(state.seed));
 
 /**
  * Creates a new game state for a normal, daily, or shared-seed run.
@@ -76,6 +94,7 @@ export function createRun(seed, mode = "normal", date = null) {
     nextLocks: Array(6).fill(null),
     pendingEvents: [],
     packageActivations: 0,
+    packagePassword: packagePassword(seed),
     seenEvents: [],
     bombEvents: [],
     effectRolls: 0,
@@ -149,6 +168,10 @@ export function syncTrinkets(state) {
   const metadata = new Map();
   for (const item of state.trinkets) {
     // Lucky Seven no longer grows power; discard that field from older saves.
+    if (item.id === "package")
+      item.metadata.password = Number(
+        (state.packagePassword ??= packagePassword(state.seed)),
+      );
     if (item.id === "seven") delete item.metadata.power;
     if (!metadata.has(item.id)) metadata.set(item.id, item.metadata);
     item.metadata = metadata.get(item.id);
@@ -284,7 +307,10 @@ function land(state, index, rng) {
 function recordSeen(state, indices) {
   for (const index of indices) {
     const value = reelValue(state.reels[index]);
-    const eightHits = 1 + count(state, "eightball");
+    const eightHits =
+      value === 8
+        ? eightBallHits(state, effectRng(state, "eightball-seen"))
+        : 1;
     const octopusCash =
       value === 8
         ? Math.max(0, 8 - Math.floor((state.eightsSeen ?? 0) / 8)) * eightHits
@@ -688,29 +714,30 @@ function randomTrinket(state, rarities = null) {
   return def;
 }
 
-/** Upgrades every other trinket and reconnects metadata for duplicate rewards. */
+/** Transforms the whole inventory using fixed catalog priorities. */
 function openPackage(state) {
   state.packageActivations = (state.packageActivations ?? 0) + 1;
-  const others = state.trinkets.filter((t) => t.id !== "package");
-  for (const item of others) {
-    const rarity =
-      trinketRarities[
-        Math.min(3, trinketRarities.indexOf(ITEMS[item.id].rarity) + 1)
-      ];
-    const pool = availableTrinkets.filter(
-      (t) => t.rarity === rarity && t.id !== "package" && !has(state, t.id),
+  const rng = random(
+    hash(`${state.seed}:package-transform:${state.packageActivations}`),
+  );
+  for (const item of [...state.trinkets]) {
+    const minimum = Math.min(
+      3,
+      trinketRarities.indexOf(ITEMS[item.id].rarity) + 1,
     );
-    const replacement = choose(pool, effectRng(state, "package")) ?? ITEMS.bug;
-    if (replacement) {
-      const index = state.trinkets.indexOf(item);
-      state.trinkets[index] = ownItem(replacement.id);
-      syncTrinkets(state);
-      state.revealTrinket = replacement.id;
-      if (replacement.id === "moai")
-        state.trinkets[index].metadata.favorite = Math.floor(
-          effectRng(state, "moai")() * 10,
-        );
-    }
+    const pool = availableTrinkets.filter(
+      (t) => t.rarity === trinketRarities[minimum] && !has(state, t.id),
+    );
+    const replacement =
+      chooseShopItem(availableTrinkets, pool, rng, () => 1) ?? ITEMS.bug;
+    const index = state.trinkets.indexOf(item);
+    state.trinkets[index] = ownItem(replacement.id);
+    syncTrinkets(state);
+    state.revealTrinket = replacement.id;
+    if (replacement.id === "moai")
+      state.trinkets[index].metadata.favorite = Math.floor(
+        effectRng(state, "moai")() * 10,
+      );
   }
 }
 
@@ -741,15 +768,14 @@ function acquire(state, id) {
 function onAcquire(state, item, copied = false) {
   const id = item.id,
     def = ITEMS[id];
-  if (id === "package") openPackage(state);
   if (["test-tube", "alembic"].includes(id)) experiment(state, item);
   if (id === "moai" && !copied && count(state, id) === 1)
     item.metadata.favorite = Math.floor(effectRng(state, "moai")() * 10);
   if (id === "cartwheel")
     for (const t of state.tools.filter((t) => REROLLS.includes(t.id)))
-      t.uses += 5;
+      t.uses += 3;
   if (def.kind === "tool" && REROLLS.includes(id) && has(state, "cartwheel"))
-    item.uses += 5 * count(state, "cartwheel");
+    item.uses += 3 * count(state, "cartwheel");
 }
 
 /** Scores one trinket copy and resolves its active reward effects. */
@@ -791,9 +817,9 @@ function activate(state, item) {
     state.bank += amount;
     notes.push(`+$${amount} interest`);
   }
-  if (item.id === "package") {
+  if (item.id === "package" && packageMatches(state)) {
     openPackage(state);
-    notes.push("Replaced other trinkets");
+    notes.push("Password matched: transformed all trinkets");
   }
   if (notes.length)
     event.note = [event.note, ...notes].filter(Boolean).join("\n");
@@ -805,7 +831,7 @@ export function settleSpin(state) {
   if (state.phase !== "editing") return false;
   syncTrinkets(state);
   const snapshot = [...state.trinkets];
-  // Bank and Package have entry/acquisition hooks; Camera can explicitly activate them.
+  // Package resolves after the original inventory has finished scoring.
   state.events = [
     ...state.pendingEvents,
     ...snapshot
@@ -885,6 +911,11 @@ export function settleSpin(state) {
     points,
     bonus,
   });
+  if (snapshot.some((item) => item.id === "package") && packageMatches(state)) {
+    openPackage(state);
+    const event = state.events.find((event) => event.id === "package");
+    if (event) event.note = "Password matched: transformed all trinkets";
+  }
   state.pendingEvents = [];
   state.phase = state.round === TOTAL_SPINS ? "finished" : "scored";
   return true;
