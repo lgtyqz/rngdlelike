@@ -284,7 +284,7 @@ function land(state, index, rng) {
 function recordSeen(state, indices) {
   for (const index of indices) {
     const value = reelValue(state.reels[index]);
-    const eightHits = 2 ** count(state, "eightball");
+    const eightHits = 1 + count(state, "eightball");
     const octopusCash =
       value === 8
         ? Math.max(0, 8 - Math.floor((state.eightsSeen ?? 0) / 8)) * eightHits
