@@ -24,7 +24,7 @@ import {
   rerollPrice,
   shareText,
 } from "./engine.js";
-import { dailySeed, dailyDateForSeed, utcDate, parseSeed } from "./random.js";
+import { dailySeed, dailyDateForSeed, utcDate, parseSeed, hash } from "./random.js";
 
 import { BackgroundMusic, GameAudio } from "./audio.js";
 import { animateCount } from "./animation.js";
@@ -60,6 +60,32 @@ const help = document.querySelector("#help");
 const credits = document.querySelector("#credits");
 const changelog = document.querySelector("#changelog");
 const SAVE_KEY = "rngdlelike.run.v2";
+const CHANGELOG_SEEN_KEY = "rngdlelike.changelog-seen.v1";
+// Derive the revision from the visible text so editing the changelog is enough.
+const changelogRevision = String(hash(changelog.textContent.replace(/\s+/g, " ").trim()));
+
+/** Records both manual and automatic views without requiring browser storage. */
+function openChangelog() {
+  changelog.showModal();
+  changelog.scrollTop = 0;
+  try {
+    localStorage.setItem(CHANGELOG_SEEN_KEY, changelogRevision);
+  } catch {}
+}
+
+/** Establishes a first-visit baseline; returning players see changed notes once. */
+function checkChangelog() {
+  try {
+    const seen = localStorage.getItem(CHANGELOG_SEEN_KEY);
+    const visited = seen !== null || [
+      SAVE_KEY,
+      "rngdlelike.sound.v1",
+      "rngdlelike.music-volume.v1",
+    ].some((key) => localStorage.getItem(key) !== null);
+    if (visited && seen !== changelogRevision) openChangelog();
+    else localStorage.setItem(CHANGELOG_SEEN_KEY, changelogRevision);
+  } catch {}
+}
 const COLORS = [
   "#e34058",
   "#e38140",
@@ -1623,7 +1649,8 @@ app.addEventListener("click", async (event) => {
   }
   if (["help", "credits", "changelog"].includes(action)) {
     hideTooltip();
-    ({ help, credits, changelog })[action].showModal();
+    if (action === "changelog") openChangelog();
+    else ({ help, credits })[action].showModal();
     return;
   }
   if (ui.busy) return;
@@ -1883,6 +1910,7 @@ function seedInfo() {
 }
 
 render();
+checkChangelog();
 // The fallback uses the same published algorithm, so the daily remains identical offline.
 fetch("data/daily-seeds.json")
   .then((response) => {
