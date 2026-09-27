@@ -1,6 +1,6 @@
 ID,Trinket Name,Emoji,Ability,Rarity,,Stats,
-even,Even,balance scales,Score 4 points for each even digit.,Common,,Common,17
-odd,Odd Duck,duck,Score 4 points for each odd digit.,Common,,Uncommon,18
+even,Even,balance scales,Score 5 points for each even digit.,Common,,Common,17
+odd,Odd Duck,duck,Score 5 points for each odd digit.,Common,,Uncommon,18
 pair,Cherries,cherries,Score 8 points for each pair of digits.,Common,,Rare,14
 high,Head in the Clouds,head in clouds,Score 3 points for each digit that is 5 or higher.,Common,,Legendary,10
 low,Small Fry,fries,Score 6 points for each digit lower than 4.,Common,,,
@@ -11,13 +11,13 @@ seven,Lucky Seven,slot machine,Every 7 increases the points I give on every spin
 bookends,Bookends,book,Score 50 points if the first and last digits match.,Uncommon,,,
 rainbow,Rainbow,rainbow,Score 9 points for each different digit.,Uncommon,,,
 triple,Hat Trick,soccer ball,Score 100 points for every group of three matching digits.,Rare,,,
-miniflush,Mini-Flush,toilet paper,Score 150 points if you have 4 of the same number.,Rare,,,
+miniflush,Mini-Flush,toilet paper,Score 200 points if you have 4 of the same number.,Uncommon,,,
 flush,Flush,toilet,Score 300 points if you have 5 of the same number.,Legendary,,,
 brainrot2,Brainrot II,skull,"Score 167 points if you have a 6 and then 7, in that order.",Rare,,,
 brainrot3,Brainrot III,shrug,Score 670 points if you only have 6s and 7s.,Legendary,,,
 mining,Pickaxe,pickaxe,Increases the chance of Rares and Legendaries in the shop by 25%.,Uncommon,,,
 magnifier,Magnifying Glass,magnifying glass,Increases the chance of Rares and Legendaries in the shop by 50%.,Rare,,,
-detective,Detective,detective,"Score 10,000 points if you score the most common password (123456, in order).",Legendary,,,
+detective,Detective,detective,"Score 10,000 points and gain $78 if you score the most common password (123456, in order).",Legendary,,,
 pig,Piggy Bank,pig,Gain $20 after each spin.,Common,,,
 stocks,Stonks,chart increasing with yen,Gain $100 after each spin.,Uncommon,,,
 nerd,Nerd,nerd,Score 420 points and gain $42 for each non-rational number reel you score.,Rare,,,
@@ -27,7 +27,7 @@ eightball,Eight Ball,eight ball,8s have a 68% chance to trigger twice. Each addi
 realknife,The Real Knife,kitchen knife,Every nine 9s you see guarantees a Legendary Trinket in the next shop and gives you $99.,Rare,,,
 hundred,100,100,Score 100 points if your number ends in two zeroes.,Uncommon,,,
 cross,The Cross,latin cross,Greatly reduce the chance to see the number 6.,Uncommon,,,
-ministraight,Mini Straight,paperclip,"If you have 3 numbers in a row that go sequentially up or down, score the product of those numbers.",Rare,,,
+ministraight,Mini Straight,paperclip,"If you have 3 numbers in a row that go sequentially up or down, score the product of those numbers.",Uncommon,,,
 straight,Straight,ruler,"If you have 4 or more numbers in a row that go sequentially up or down, score the product of those numbers.",Rare,,,
 graduate,Graduate,graduate,Increases your chance to see Rare and Legendary tools.,Uncommon,,,
 bearmarket,Bear Market,downwards chart,"If your last number is lower than your first number, gain $40 and score 40 points.",Uncommon,,,
@@ -48,27 +48,27 @@ constructionworker,Construction Worker,construction worker,"After each spin, gai
 technologist,Technologist,technologist,"After each spin, gain a random tool.",Legendary,,,
 cartwheel,Cartwheeler,cartwheeler,Reroll tools have +5 uses each spin.,Rare,,,
 package,Mysterious Package,package,"Score the password to transform ALL your trinkets, including this one, into random trinkets one rarity higher. Legendary trinkets transform into other unowned Legendaries. If the target rarity is exhausted, transform into a Bug.",Rare,,,
-bank,Bank,bank,Gain 10% interest when you enter a shop.,Common,,,
-moai,Moai,moai,Picks a new favorite number when you spin. Multiplies your points this round by 2 EVERY time it scores its favorite number.,Legendary,,,
+bank,Bank,bank,Gain 10% interest when you enter a shop.,Rare,,,
+moai,Moai,moai,Picks a favorite number from your reels when you spin. Multiplies your points this round by 3 EVERY time it scores its favorite number.,Legendary,,,
 relaxedface,Relaxed Face,relaxed face,Scores +24 points no matter what you spin.,Common,,,
 blackjack,Blackjack,spade,"If your numbers sum to 21, triple your score this round.",Common,,,
 fullhouse,Full House,house,Double your score this round if you have three of the same digit and two or more of a different digit.,Common,,,
-family,The Family,family,Score 10 times the sum of all your digits.,Rare,,,
+family,The Family,family,Score 8 times the sum of all your digits.,Rare,,,
 bean,Bean Counter,bean,"Score 1 point for each 1, then increase the number of points I score by 5.",Common,,,
 dragon,Dragon,dragon,Scores +10 points each spin for each trinket you have.,Common,,,
-wheel,Wheel,wheel,Shop rerolls cost 1 less.,Common,,,
+wheel,Wheel,wheel,Shop rerolls cost 2 less.,Common,,,
 pairofeyes,Pair of Eyes,eyes,"If you have two zeroes that aren't next to each other, score 21 times your highest digit.",Rare,,,
 
-bicycle,Bicycle,bicycle,Rerolls cost 2 less.,Uncommon,5,Common
+bicycle,Bicycle,bicycle,Rerolls cost 4 less.,Uncommon,5,Common
 apple,Apple,apple,Scores 10 points for each pair of numbers you have that sum to 10.,Common,2,Uncommon
 clover,Four-Leaf Clover,four leaf clover,Doubles your chance of rolling a 7.,Common,7,Rare
 octopus,Octopus,octopus,"When I see an 8, gain $8.",Common,2,Legendary
 yinyang,Yin & Yang,yinyang,Scores 88 points if you have an equal number of odd and even numbers.,Uncommon,,
 printer,Printer,printer,Every shop adds a copy of one of your trinkets at double price for sale.,Legendary,,
-checkered-flag,Checkered Flag,checkered flag,"If you don't meet the goal, gain enough points to meet it.",Rare,,
+checkered-flag,Checkered Flag,checkered flag,Always score 50% of this round's goal.,Rare,,
 hammer,Hammer,hammer,Shops have one more tool upgrade.,Rare,,
 backpack,Backpack,backpack,Shops have one more trinket.,Rare,,
-new moon,New Moon,new moon face,Multiplies your score by 10 for every grey slot.,Legendary,,
+new moon,New Moon,new moon face,Multiplies your score by 4 for every grey slot.,Legendary,,
 bug,Bug,bug,What did you do? (Scores for 2560 points),Fallback,,
 mechanical-arm,Mechanical Arm,mechanical arm,Tool upgrades are much more likely to be Rare or Legendary.,Rare,,
 robot,Robot,robot,"Scores 101 (5) points every spin. When Robot sees a 0 or 1, increase the points this gives by 1.",Common,,

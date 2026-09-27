@@ -88,9 +88,9 @@ export function scoreTrinket(item, reels, state = null) {
     case "new moon":
       for (const i of all.filter((index) => !isDigit(reels[index])))
         steps.push({ reels: [i], points: 0 });
-      multiplier = 10 ** steps.length;
+      multiplier = 4 ** steps.length;
       steps.forEach((step, index) => {
-        step.note = `Grey slot: ×10 (${index + 1}/${steps.length})`;
+        step.note = `Grey slot: ×4 (${index + 1}/${steps.length})`;
       });
       break;
     case "bug":
@@ -122,10 +122,10 @@ export function scoreTrinket(item, reels, state = null) {
     case "alembic":
       break;
     case "even":
-      each((n) => n % 2 === 0, 4);
+      each((n) => n % 2 === 0, 5);
       break;
     case "odd":
-      each((n) => n % 2 === 1, 4);
+      each((n) => n % 2 === 1, 5);
       break;
     case "high":
       each((n) => n > 6, 6);
@@ -145,7 +145,7 @@ export function scoreTrinket(item, reels, state = null) {
     case "family":
       each(
         () => true,
-        (n) => n * 10,
+        (n) => n * 8,
       );
       break;
     case "bean":
@@ -237,7 +237,10 @@ export function scoreTrinket(item, reels, state = null) {
       break;
     }
     case "detective":
-      flat(reels.join(",") === "1,2,3,4,5,6", 10000);
+      if (reels.join(",") === "1,2,3,4,5,6") {
+        flat(true, 10000);
+        cash = 78;
+      }
       break;
     case "pig":
       cash = 8;
@@ -338,12 +341,14 @@ export function scoreTrinket(item, reels, state = null) {
       break;
     case "moai": {
       const favorite = item.metadata.favorite;
-      for (const i of all.filter((index) => reels[index] === favorite))
+      for (const i of all.filter(
+        (index) => isDigit(favorite) && reels[index] === favorite,
+      ))
         for (let hit = 0, hits = favorite === 8 ? eight() : 1; hit < hits; hit++)
           steps.push({ reels: [i], points: 0 });
-      multiplier = 2 ** steps.length;
+      multiplier = 3 ** steps.length;
       steps.forEach((step, index) => {
-        step.note = `Favorite ${favorite}: ×2 (${index + 1}/${steps.length})`;
+        step.note = `Favorite ${favorite}: ×3 (${index + 1}/${steps.length})`;
       });
       if (steps.length)
         note = `Favorite ${favorite}: ${steps.length} ${steps.length === 1 ? "match" : "matches"}`;

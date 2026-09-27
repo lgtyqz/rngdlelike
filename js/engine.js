@@ -18,16 +18,33 @@ export { scoreTrinket } from "./scoring.js";
 export const TOTAL_SPINS = 20;
 export const TOOL_CHANCE = 0.6;
 /** Returns the point target for a given round. */
-export const goalFor = (round) => 10 + round * (round - 1) * 5;
+export const goalFor = (round) => {
+  if (round < 11) {
+    return 10 + round * (round - 1) * 5;
+  }
+  return (
+    10 +
+    (round * (round - 1) * 5) / 2 +
+    (round - 9) * (round - 8) * (round - 7) * 10
+  );
+};
 /** Returns the cash bonus awarded for meeting a round's point target. */
-export const bonusFor = (round) => 20 + (round - 1) * 5;
+export const bonusFor = (round) => {
+  if (round < 10) {
+    return 20 + (round - 1) * 5;
+  }
+  return 20 + (round - 1) * (round - 1);
+};
 /** Returns the guaranteed cash allowance awarded after a round. */
 export const allowanceFor = (round) => 10 + round * 5;
 /** Returns the current cost to reroll the shop. */
 export const rerollPrice = (state) =>
   Math.max(
     0,
-    5 + state.rerolls * 5 - count(state, "wheel") - 2 * count(state, "bicycle"),
+    3 +
+      state.rerolls * 5 -
+      2 * count(state, "wheel") -
+      4 * count(state, "bicycle"),
   );
 
 /** Counts all owned copies, including clones, for stackable passive effects. */
@@ -204,13 +221,19 @@ function displayedPosition(state, index) {
     : pool.findIndex(matches);
 }
 
+/** Picks a displayed digit for Moai, including bomb countdowns. */
+function chooseMoaiFavorite(state) {
+  const digits = state.reels.map(reelValue).filter(isDigit);
+  return digits[Math.floor(effectRng(state, "moai")() * digits.length)] ?? null;
+}
+
 /** Chooses one favorite digit per shared Moai stack for this round. */
 function favorite(state) {
   for (const item of state.trinkets.filter(
     (t, i, all) =>
       t.id === "moai" && all.findIndex((other) => other.id === t.id) === i,
   ))
-    item.metadata.favorite = Math.floor(effectRng(state, "moai")() * 10);
+    item.metadata.favorite = chooseMoaiFavorite(state);
 }
 
 /** Queues a bomb event for reel notifications and the scoring log. */
@@ -425,7 +448,7 @@ function previewCameraPoints(state) {
   for (const event of state.pendingEvents.filter(
     (event) => event.id === "checkered-flag",
   )) {
-    const extra = Math.max(0, goalFor(state.round) - points);
+    const extra = Math.ceil(goalFor(state.round) * 0.3);
     event.previewPoints += extra;
     points += extra;
   }
@@ -734,9 +757,7 @@ function openPackage(state) {
     syncTrinkets(state);
     state.revealTrinket = replacement.id;
     if (replacement.id === "moai")
-      state.trinkets[index].metadata.favorite = Math.floor(
-        effectRng(state, "moai")() * 10,
-      );
+      state.trinkets[index].metadata.favorite = chooseMoaiFavorite(state);
   }
 }
 
@@ -769,7 +790,7 @@ function onAcquire(state, item, copied = false) {
     def = ITEMS[id];
   if (["test-tube", "alembic"].includes(id)) experiment(state, item);
   if (id === "moai" && !copied && count(state, id) === 1)
-    item.metadata.favorite = Math.floor(effectRng(state, "moai")() * 10);
+    item.metadata.favorite = chooseMoaiFavorite(state);
   if (id === "cartwheel")
     for (const t of state.tools.filter((t) => REROLLS.includes(t.id)))
       t.uses += 3;
@@ -782,7 +803,7 @@ function activate(state, item) {
   const event = scoreTrinket(item, state.reels, state);
   state.bank += event.cash;
   /** Provides the next seeded activation roll for this item. */
-  const rng = () => effectRng(state, item.id);
+  const roll = () => effectRng(state, item.id)();
   const notes = [];
   if (["test-tube", "alembic"].includes(item.id))
     notes.push(`Gained ${experiment(state, item).name}`);
@@ -790,11 +811,7 @@ function activate(state, item) {
     notes.push(`${item.metadata.count}/${item.id === "realknife" ? 9 : 8}`);
   }
   if (item.id === "constructionworker") {
-    const t = chooseUpgrade(
-      state.tools,
-      rng(),
-      4 ** count(state, "mechanical-arm"),
-    );
+    const t = state.tools[Math.floor(roll() * state.tools.length)];
     if (t) {
       t.maxUses++;
       t.uses++;
@@ -802,10 +819,10 @@ function activate(state, item) {
     }
   }
   if (item.id === "technologist") {
-    const def = choose(
-      TOOLS.filter((t) => !state.tools.some((owned) => owned.id === t.id)),
-      rng(),
+    const pool = TOOLS.filter(
+      (t) => !state.tools.some((owned) => owned.id === t.id),
     );
+    const def = pool[Math.floor(roll() * pool.length)];
     if (def) {
       acquire(state, def.id);
       notes.push(`Gained ${def.name}`);
@@ -847,7 +864,7 @@ export function settleSpin(state) {
       const before = points;
       // Multipliers appear at the end, after all additive contributions.
       if (["moai", "new moon"].includes(event.id)) {
-        const factor = event.id === "moai" ? 2 : 10;
+        const factor = event.id === "moai" ? 3 : 4;
         for (const step of event.steps) {
           step.points = points * (factor - 1);
           points *= factor;
@@ -865,7 +882,7 @@ export function settleSpin(state) {
     state.events.push(event);
   }
   for (const event of state.events.filter((e) => e.id === "checkered-flag")) {
-    const extra = Math.max(0, goalFor(state.round) - points);
+    const extra = Math.ceil(goalFor(state.round) * 0.3);
     event.points += extra;
     if (extra) event.steps.push({ reels: [], points: extra });
     points += extra;
@@ -946,17 +963,6 @@ function choose(pool, rng, boost = 1) {
           pool.filter((p) => p.rarity === def.rarity).length) < 0,
     ) || pool.at(-1)
   );
-}
-
-/** Selects an owned tool using each tool's individual rarity weight. */
-function chooseUpgrade(tools, rng, boost = 1) {
-  /** Computes an owned tool’s weight for upgrade selection. */
-  const weightFor = (owned) =>
-    RARITIES[ITEMS[owned.id].rarity].weight *
-    (["rare", "legendary"].includes(ITEMS[owned.id].rarity) ? boost : 1);
-  const weight = tools.reduce((sum, owned) => sum + weightFor(owned), 0);
-  let roll = rng() * weight;
-  return tools.find((owned) => (roll -= weightFor(owned)) < 0) || tools.at(-1);
 }
 
 /**
@@ -1066,15 +1072,14 @@ export function generateOffers(state) {
       : { kind, empty: true },
   );
   for (let slot = 0; slot < count(state, "printer"); slot++) {
-    const pool = state.trinkets.filter(
-      (t) => t.id !== "bug" && t.id !== "printer",
-    );
-    const original = chooseShopItem(
-      availableTrinkets,
-      pool,
-      rng,
-      (def) => pool.filter((item) => item.id === def.id).length,
-    );
+    const pool = [
+      ...new Map(
+        state.trinkets
+          .filter((t) => t.id !== "bug" && t.id !== "printer")
+          .map((item) => [item.id, item]),
+      ).values(),
+    ];
+    const original = chooseShopItem(availableTrinkets, pool, rng, () => 1);
     if (original)
       offers.push({
         id: original.id,
