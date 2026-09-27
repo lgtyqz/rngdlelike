@@ -829,7 +829,7 @@ function renderGame({ animateOffers = false } = {}) {
                   ? "choose a trinket with an activated ability"
                   : "choose a trinket"
                 : def.target === "tool"
-                  ? "choose another tool ($30)"
+                  ? "choose another tool"
                   : "choose a reel"
           }
           <button data-action="cancel-tool">cancel</button>
