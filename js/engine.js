@@ -260,9 +260,11 @@ function land(state, index, rng) {
   const pool = state.reelPools[index];
   const locked = state.locks[index];
   if (locked != null) {
-    const position = state.positions[index];
-    if (position < 0 || position >= pool.length)
-      state.positions[index] = pool.findIndex((slot) => slot === locked);
+    state.reels[index] = locked;
+    state.qubits[index] = locked === "qubit";
+    // Follow the saved face, not the slot that happened to land before edits.
+    // A temporary value can still be locked even without a matching pool slot.
+    state.positions[index] = displayedPosition(state, index);
     const bombCount =
       typeof locked === "string" && /^bomb:[1-3]$/.test(locked)
         ? Number(locked.slice(5))
@@ -272,9 +274,6 @@ function land(state, index, rng) {
       if (slot?.type === "bomb")
         countDownBomb(state, index, state.positions[index]);
       else countDownBombCopy(state, index, bombCount);
-    } else {
-      state.reels[index] = locked;
-      state.qubits[index] = locked === "qubit";
     }
     return;
   }

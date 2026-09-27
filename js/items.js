@@ -1047,7 +1047,7 @@ export const TOOLS = [
     emoji: "🔒",
     rarity: "uncommon",
     effect: "lock",
-    description: "Fix a reel at its current value for the next spin.",
+    description: "Lock the displayed value for the next spin, even if it isn't in the reel's pool.",
     kind: "tool",
     maxUses: 1,
     limitedUse: false,
