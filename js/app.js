@@ -24,7 +24,13 @@ import {
   rerollPrice,
   shareText,
 } from "./engine.js";
-import { dailySeed, dailyDateForSeed, utcDate, parseSeed, hash } from "./random.js";
+import {
+  dailySeed,
+  dailyDateForSeed,
+  utcDate,
+  parseSeed,
+  hash,
+} from "./random.js";
 
 import { BackgroundMusic, GameAudio } from "./audio.js";
 import { animateCount } from "./animation.js";
@@ -62,7 +68,9 @@ const changelog = document.querySelector("#changelog");
 const SAVE_KEY = "rngdlelike.run.v2";
 const CHANGELOG_SEEN_KEY = "rngdlelike.changelog-seen.v1";
 // Derive the revision from the visible text so editing the changelog is enough.
-const changelogRevision = String(hash(changelog.textContent.replace(/\s+/g, " ").trim()));
+const changelogRevision = String(
+  hash(changelog.textContent.replace(/\s+/g, " ").trim()),
+);
 
 /** Records both manual and automatic views without requiring browser storage. */
 function openChangelog() {
@@ -77,11 +85,11 @@ function openChangelog() {
 function checkChangelog() {
   try {
     const seen = localStorage.getItem(CHANGELOG_SEEN_KEY);
-    const visited = seen !== null || [
-      SAVE_KEY,
-      "rngdlelike.sound.v1",
-      "rngdlelike.music-volume.v1",
-    ].some((key) => localStorage.getItem(key) !== null);
+    const visited =
+      seen !== null ||
+      [SAVE_KEY, "rngdlelike.sound.v1", "rngdlelike.music-volume.v1"].some(
+        (key) => localStorage.getItem(key) !== null,
+      );
     if (visited && seen !== changelogRevision) openChangelog();
     else localStorage.setItem(CHANGELOG_SEEN_KEY, changelogRevision);
   } catch {}
@@ -491,6 +499,7 @@ function renderMenu() {
         <button class="text-button" data-action="help">How to play</button>
         <button class="text-button" data-action="credits">Credits</button>
         <button class="text-button" data-action="changelog">Changelog</button>
+        <a class="text-button" href="https://discord.gg/SqxPDsz25D">Join the Discord</a>
       </footer>
     </section>
   `;
@@ -1596,7 +1605,7 @@ for (const dialog of [help, credits, changelog]) {
 
 document.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) return;
-  const button = event.target.closest("button");
+  const button = event.target.closest("button, a");
   if (!button || button.disabled) return;
   sound.unlock();
   sound.play("mousedown");
@@ -1604,7 +1613,7 @@ document.addEventListener("pointerdown", (event) => {
 
 document.addEventListener("pointerup", (event) => {
   if (event.button !== 0) return;
-  const button = event.target.closest("button");
+  const button = event.target.closest("button, a");
   if (!button || button.disabled) return;
   sound.play("mouseup");
 });
