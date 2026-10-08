@@ -14,6 +14,7 @@ import {
   reelValue,
   eightBallHits,
 } from "./scoring.js";
+import { trinketEffects, markActivated } from "./effects.js";
 export { scoreTrinket } from "./scoring.js";
 export const TOTAL_SPINS = 20;
 export const TOOL_CHANCE = 0.6;
@@ -48,9 +49,24 @@ export const rerollPrice = (state) =>
   );
 
 /** Counts all owned copies, including clones, for stackable passive effects. */
-const count = (state, id) => state.trinkets.filter((t) => t.id === id).length;
-const availableTrinkets = TRINKETS.filter((t) => t.rarity !== "fallback");
+const count = (state, id) =>
+  trinketEffects(state).filter((t) => t.id === id).length;
+const availableTrinkets = TRINKETS.filter(
+  (t) => !["fallback", "token"].includes(t.rarity),
+);
 const trinketRarities = ["common", "uncommon", "rare", "legendary"];
+const EXPERIMENTS = ["test-tube", "alembic", "upgradeexp", "toolexp"];
+const canOffer = (state, id) =>
+  !has(state, id) ||
+  (EXPERIMENTS.includes(id) && count(state, "scientist") > 0);
+const canTransform = (state, item) =>
+  !trinketEffects(state).some(
+    (effect) => effect.owner === item && effect.id === "fallingleaves",
+  );
+const passiveActivated = (state, id) =>
+  trinketEffects(state)
+    .filter((item) => item.id === id)
+    .forEach((item) => markActivated(state, item));
 /** Combines the rarity boosts from every owned mining and magnifier copy. */
 const shopBoost = (state) =>
   1.25 ** count(state, "mining") * 1.5 ** count(state, "magnifier");
@@ -127,9 +143,7 @@ export function createRun(seed, mode = "normal", date = null) {
   for (let i = 0; i < 2; i++) {
     const def = choose(
       availableTrinkets.filter(
-        (t) =>
-          !["package", "test-tube", "alembic"].includes(t.id) &&
-          !has(state, t.id),
+        (t) => !["package", ...EXPERIMENTS].includes(t.id) && !has(state, t.id),
       ),
       trinketRng,
     );
@@ -166,6 +180,11 @@ const PASSIVES = new Set([
   "screwdriver",
   "cartwheel",
   "wheel",
+  "scientist",
+  "confettihorn",
+  "partyface",
+  "fallingleaves",
+  "ferriswheel",
 ]);
 /** Creates the next deterministic effect roll without consuming shop or spin randomness. */
 const effectRng = (state, label) =>
@@ -184,6 +203,11 @@ export const reelLabel = (value) =>
 export function syncTrinkets(state) {
   const metadata = new Map();
   for (const item of state.trinkets) {
+    item.uid ??= state.nextTrinketUid = (state.nextTrinketUid ?? 0) + 1;
+    state.nextTrinketUid = Math.max(state.nextTrinketUid ?? 0, item.uid);
+    item.metadata ??= {};
+    for (const [key, value] of Object.entries(ITEMS[item.id].metadata ?? {}))
+      if (!(key in item.metadata)) item.metadata[key] = value;
     // Lucky Seven no longer grows power; discard that field from older saves.
     if (item.id === "package")
       item.metadata.password = Number(
@@ -203,8 +227,52 @@ function cloneTrinket(state, original) {
     metadata: existing?.metadata ?? original.metadata,
   };
   state.trinkets.push(copy);
+  syncTrinkets(state);
   state.revealTrinket = copy.id;
   return copy;
+}
+
+/** Replaces one owned trinket and pays every Falling Leaves ability once. */
+function transformTrinket(state, item, id) {
+  if (!state.trinkets.includes(item) || !canTransform(state, item))
+    return false;
+  const leaves = trinketEffects(state).filter((t) => t.id === "fallingleaves");
+  const uid = item.uid;
+  Object.assign(item, ownItem(id), { uid });
+  syncTrinkets(state);
+  onAcquire(state, item);
+  state.revealTrinket = id;
+  for (const leaf of leaves) {
+    state.bank += 30;
+    markActivated(state, leaf);
+    if (state.phase === "editing")
+      state.pendingEvents.push({
+        id: leaf.owner.id,
+        points: 0,
+        cash: 30,
+        multiplier: 1,
+        note: "+$30 for a transformation",
+        steps: [],
+        cashOnly: true,
+      });
+  }
+  return true;
+}
+
+function awakenDormant(state) {
+  if (["brainrot1", "brainrot2", "brainrot3"].every((id) => count(state, id)))
+    for (const ability of trinketEffects(state).filter(
+      (t) => t.id === "dormant1",
+    )) {
+      if (
+        !trinketEffects(state).some(
+          (t) => t.owner === ability.owner && t.id === "dormant1",
+        )
+      )
+        continue;
+      markActivated(state, ability);
+      transformTrinket(state, ability.owner, "dormant2");
+    }
 }
 
 /** Finds the displayed slot, preferring its landing position when still valid. */
@@ -229,11 +297,16 @@ function chooseMoaiFavorite(state) {
 
 /** Chooses one favorite digit per shared Moai stack for this round. */
 function favorite(state) {
-  for (const item of state.trinkets.filter(
-    (t, i, all) =>
-      t.id === "moai" && all.findIndex((other) => other.id === t.id) === i,
-  ))
-    item.metadata.favorite = chooseMoaiFavorite(state);
+  const seen = new Set();
+  for (const item of trinketEffects(state)) {
+    if (!["moai", "liberty"].includes(item.id) || seen.has(item.metadata))
+      continue;
+    seen.add(item.metadata);
+    item.metadata.favorite =
+      item.id === "moai"
+        ? chooseMoaiFavorite(state)
+        : Math.floor(effectRng(state, "liberty")() * 10);
+  }
 }
 
 /** Queues a bomb event for reel notifications and the scoring log. */
@@ -281,6 +354,8 @@ function countDownBombCopy(state, index, count) {
 /** Lands a reel using its lock or weighted pool and resolves bomb countdowns. */
 function land(state, index, rng) {
   const pool = state.reelPools[index];
+  if (pool.includes(6)) passiveActivated(state, "cross");
+  if (pool.includes(7)) passiveActivated(state, "clover");
   const locked = state.locks[index];
   if (locked != null) {
     state.reels[index] = locked;
@@ -326,7 +401,7 @@ function land(state, index, rng) {
 
 // A number is seen when it lands or a tool places it on a reel. Scoring the
 // finished board must not count those same numbers a second time.
-function recordSeen(state, indices) {
+function recordSeen(state, indices, abilities = null) {
   for (const index of indices) {
     const value = reelValue(state.reels[index]);
     const eightHits =
@@ -337,9 +412,52 @@ function recordSeen(state, indices) {
       value === 8
         ? Math.max(0, 8 - Math.floor((state.eightsSeen ?? 0) / 8)) * eightHits
         : 0;
-    if (value === 8) state.eightsSeen = (state.eightsSeen ?? 0) + 1;
-    for (const item of [...state.trinkets]) {
+    if (
+      value === 8 &&
+      (!abilities || abilities.some((t) => t.id === "octopus"))
+    )
+      state.eightsSeen = (state.eightsSeen ?? 0) + 1;
+    for (const item of abilities ?? trinketEffects(state)) {
+      if (!state.trinkets.includes(item.owner)) continue;
+      if (
+        ["numbers", "anxious"].includes(item.id) &&
+        value === item.metadata.nextDigit
+      ) {
+        markActivated(state, item);
+        item.metadata.nextDigit++;
+        let note = `Looking for ${item.metadata.nextDigit}`;
+        if (item.metadata.nextDigit === 10) {
+          item.metadata.nextDigit = 0;
+          const reward = randomTrinket(state, [
+            item.id === "anxious" ? "legendary" : "rare",
+          ]);
+          note = `Gained ${reward.name}`;
+          if (item.id === "anxious")
+            transformTrinket(state, item.owner, "relaxedface");
+        }
+        state.seenEvents.push({ index, id: item.owner.id, note });
+      }
+      if (item.id === "monkey" && value === item.metadata.favorite) {
+        state.bank += 2;
+        markActivated(state, item);
+        item.metadata.favorite = Math.floor(effectRng(state, "monkey")() * 10);
+        state.seenEvents.push({
+          index,
+          id: item.owner.id,
+          note: `+$2 · Favorite: ${item.metadata.favorite}`,
+        });
+        state.pendingEvents.push({
+          id: item.owner.id,
+          points: 0,
+          cash: 2,
+          multiplier: 1,
+          note: `+$2 · Favorite: ${item.metadata.favorite}`,
+          steps: [],
+          cashOnly: true,
+        });
+      }
       if (item.id === "robot" && (value === 0 || value === 1)) {
+        markActivated(state, item);
         item.metadata.power += 2;
         state.seenEvents.push({
           index,
@@ -348,13 +466,20 @@ function recordSeen(state, indices) {
         });
       }
       if (item.id === "octopus" && value === 8) {
+        if (octopusCash) markActivated(state, item);
         const cash = octopusCash;
         state.bank += cash;
-        state.seenEvents.push({ index, id: item.id, note: `+$${cash}` });
-        let event = state.pendingEvents.find((event) => event.id === "octopus");
+        state.seenEvents.push({ index, id: item.owner.id, note: `+$${cash}` });
+        let event = state.pendingEvents.find(
+          (event) =>
+            event.abilityId === "octopus" && event.ownerUid === item.owner.uid,
+        );
         if (!event) {
           event = {
-            id: item.id,
+            id: item.owner.id,
+            abilityId: "octopus",
+            ownerUid: item.owner.uid,
+            cashOnly: true,
             points: 0,
             cash: 0,
             multiplier: 1,
@@ -370,6 +495,7 @@ function recordSeen(state, indices) {
       const digit =
         item.id === "realknife" ? 9 : item.id === "crystalball" ? 8 : null;
       if (digit === null || value !== digit) continue;
+      markActivated(state, item);
       const threshold = digit;
       const amount = digit === 8 ? eightHits : 1;
       item.metadata.count += amount;
@@ -409,6 +535,7 @@ function recordSeen(state, indices) {
 export function spin(state) {
   if (state.phase !== "ready") return false;
   syncTrinkets(state);
+  state.activatedTrinkets = [];
   state.eightsSeen = 0;
   const rng = random(hash(`${state.seed}:spin:${state.round}`));
   state.pendingEvents = [];
@@ -420,6 +547,7 @@ export function spin(state) {
   state.locks = Array(6).fill(null);
   state.phase = "editing";
   favorite(state);
+  awakenDormant(state);
   recordSeen(state, [0, 1, 2, 3, 4, 5]);
   return true;
 }
@@ -446,9 +574,10 @@ function previewCameraPoints(state) {
     }
   }
   for (const event of state.pendingEvents.filter(
-    (event) => event.id === "checkered-flag",
+    (event) => event.flagCount || event.id === "checkered-flag",
   )) {
-    const extra = Math.ceil(goalFor(state.round) * 0.3);
+    const extra =
+      Math.ceil(goalFor(state.round) * 0.3) * (event.flagCount || 1);
     event.previewPoints += extra;
     points += extra;
   }
@@ -487,7 +616,16 @@ export function useTool(state, id, target, source = null) {
   const pool = reel ? state.reelPools[target] : null;
   const position = reel ? displayedPosition(state, target) : -1;
   if (
-    ["bomb", "w", "soap", "pill", "qubit"].includes(id) &&
+    [
+      "bomb",
+      "w",
+      "soap",
+      "pill",
+      "qubit",
+      "razor",
+      "trollingstone",
+      "cutdown",
+    ].includes(id) &&
     (!pool || position < 0 || position >= pool.length)
   ) {
     state.reelError = {
@@ -501,7 +639,52 @@ export function useTool(state, id, target, source = null) {
     return false;
   if (id === "lock" && old == null) return false;
   if (["bomb", "w", "qubit"].includes(id)) state.positions[target] = position;
+  state.seenEvents = [];
   switch (id) {
+    case "jar":
+      if (tool.savedValue == null) {
+        if (!isDigit(reelValue(old))) return false;
+        tool.savedValue = reelValue(old);
+        seenIndices = [];
+      } else {
+        state.reels[target] = tool.savedValue;
+        delete tool.savedValue;
+      }
+      break;
+    case "razor":
+    case "trollingstone":
+    case "cutdown": {
+      const value = reelValue(old);
+      if (id === "razor" && state.bank < 30) return false;
+      if (
+        id !== "razor" &&
+        (!isDigit(value) || (id === "trollingstone" ? value > 2 : value < 7))
+      )
+        return false;
+      if (id === "razor") state.bank -= 30;
+      pool.splice(position, 1);
+      state.positions[target] = -1;
+      state.reels[target] = null;
+      break;
+    }
+    case "pawn":
+    case "dna":
+    case "magicwand": {
+      const item = Number.isInteger(target)
+        ? state.trinkets[target]
+        : state.trinkets.find((t) => t.id === target);
+      if (!item) return false;
+      if (id === "pawn") {
+        state.trinkets.splice(state.trinkets.indexOf(item), 1);
+        state.bank += 10;
+      } else if (id === "dna") {
+        if (!["common", "uncommon"].includes(ITEMS[item.id].rarity))
+          return false;
+        cloneTrinket(state, item);
+      } else if (!transformTrinket(state, item, "frog")) return false;
+      awakenDormant(state);
+      break;
+    }
     case "incrementall":
       seenIndices = [];
       state.reels.forEach((value, i) => {
@@ -632,21 +815,25 @@ export function useTool(state, id, target, source = null) {
       const item = Number.isInteger(target)
         ? state.trinkets[target]
         : state.trinkets.find((t) => t.id === target);
-      if (!item) return false;
+      if (
+        !item ||
+        !canTransform(state, item) ||
+        ITEMS[item.id].rarity === "token"
+      )
+        return false;
       const candidates = availableTrinkets.filter(
         (t) => t.rarity === ITEMS[item.id].rarity && !has(state, t.id),
       );
       const replacement =
         choose(candidates, effectRng(state, "butterfly")) ?? ITEMS.bug;
-      state.trinkets.splice(state.trinkets.indexOf(item), 1);
-      acquire(state, replacement.id);
+      transformTrinket(state, item, replacement.id);
       break;
     }
     case "sparkles": {
       const item = Number.isInteger(target)
         ? state.trinkets[target]
         : state.trinkets.find((t) => t.id === target);
-      if (!item) return false;
+      if (!item || !canTransform(state, item)) return false;
       const rarityIndex = trinketRarities.indexOf(ITEMS[item.id].rarity);
       if (rarityIndex < 0) {
         return false;
@@ -662,8 +849,7 @@ export function useTool(state, id, target, source = null) {
         acquire(state, "bug");
       } else {
         const replacement = choose(candidates, effectRng(state, "sparkles"));
-        state.trinkets.splice(state.trinkets.indexOf(item), 1);
-        acquire(state, replacement.id);
+        transformTrinket(state, item, replacement.id);
       }
       break;
     }
@@ -678,8 +864,6 @@ export function useTool(state, id, target, source = null) {
         event.points = 0;
         event.steps = [];
       }
-      if (["realknife", "crystalball"].includes(item.id))
-        seenIndices = [0, 1, 2, 3, 4, 5];
       if (item.id !== "octopus") state.pendingEvents.push(event);
       break;
     }
@@ -704,7 +888,6 @@ export function useTool(state, id, target, source = null) {
   tool.uses--;
   if (tool.bonusUses > 0) tool.bonusUses--;
   state.bombEvents = (state.bombEvents ?? []).slice(previousBombEvents);
-  state.seenEvents = [];
   recordSeen(state, seenIndices);
   const cameraId = Number.isInteger(target)
     ? state.trinkets[target]?.id
@@ -731,7 +914,10 @@ function randomTrinket(state, rarities = null) {
     (t) => !has(state, t.id) && (!rarities || rarities.includes(t.rarity)),
   );
   const rng = effectRng(state, "reward");
-  const def = pool[Math.floor(rng() * pool.length)] ?? ITEMS.bug;
+  const weight = pool.reduce((sum, t) => sum + (t.id === "dud" ? 0.1 : 1), 0);
+  let roll = rng() * weight;
+  const def =
+    pool.find((t) => (roll -= t.id === "dud" ? 0.1 : 1) < 0) ?? ITEMS.bug;
   if (def) acquire(state, def.id);
   return def;
 }
@@ -743,6 +929,7 @@ function openPackage(state) {
     hash(`${state.seed}:package-transform:${state.packageActivations}`),
   );
   for (const item of [...state.trinkets]) {
+    if (!canTransform(state, item)) continue;
     const minimum = Math.min(
       3,
       trinketRarities.indexOf(ITEMS[item.id].rarity) + 1,
@@ -752,19 +939,37 @@ function openPackage(state) {
     );
     const replacement =
       chooseShopItem(availableTrinkets, pool, rng, () => 1) ?? ITEMS.bug;
-    const index = state.trinkets.indexOf(item);
-    state.trinkets[index] = ownItem(replacement.id);
-    syncTrinkets(state);
-    state.revealTrinket = replacement.id;
-    if (replacement.id === "moai")
-      state.trinkets[index].metadata.favorite = chooseMoaiFavorite(state);
+    transformTrinket(state, item, replacement.id);
   }
 }
 
 /** Resolves an Alembic reward or a Test Tube clone with shared metadata. */
 function experiment(state, item) {
   if (item.id === "alembic") return randomTrinket(state);
-  const pool = state.trinkets.filter((t) => t !== item);
+  if (item.id === "upgradeexp") {
+    const tool =
+      state.tools[
+        Math.floor(effectRng(state, "optimization")() * state.tools.length)
+      ];
+    if (tool) {
+      tool.maxUses++;
+      tool.uses++;
+      return ITEMS[tool.id];
+    }
+    return null;
+  }
+  if (item.id === "toolexp") {
+    const pool = TOOLS.filter(
+      (t) =>
+        t.rarity === "rare" && !state.tools.some((owned) => owned.id === t.id),
+    );
+    const def = pool[Math.floor(effectRng(state, "thought")() * pool.length)];
+    if (def) acquire(state, def.id);
+    return def;
+  }
+  const pool = state.trinkets.filter(
+    (t) => t !== (item.owner ?? item) && t.id !== "frog",
+  );
   const rng = effectRng(state, "replication");
   const original = pool[Math.floor(rng() * pool.length)];
   const copy = cloneTrinket(state, original ?? ownItem("bug"));
@@ -788,7 +993,17 @@ function acquire(state, id) {
 function onAcquire(state, item, copied = false) {
   const id = item.id,
     def = ITEMS[id];
-  if (["test-tube", "alembic"].includes(id)) experiment(state, item);
+  if (def.kind === "trinket") {
+    for (const ability of trinketEffects(state).filter(
+      (t) => t.owner === item && EXPERIMENTS.includes(t.id),
+    )) {
+      const reward = experiment(state, ability);
+      if (reward) markActivated(state, ability);
+    }
+    awakenDormant(state);
+  }
+  if (id === "monkey" || id === "liberty")
+    item.metadata.favorite = Math.floor(effectRng(state, id)() * 10);
   if (id === "moai" && !copied && count(state, id) === 1)
     item.metadata.favorite = chooseMoaiFavorite(state);
   if (id === "cartwheel")
@@ -798,18 +1013,80 @@ function onAcquire(state, item, copied = false) {
     item.uses += 3 * count(state, "cartwheel");
 }
 
-/** Scores one trinket copy and resolves its active reward effects. */
-function activate(state, item) {
+/** Combines an owner's copied abilities into one inventory card's score event. */
+function activate(state, item, context = {}) {
+  const ownerId = item.id;
+  const path = context.path ?? new Set();
+  if (path.has(item.uid)) return emptyEvent(item.id);
+  const next = new Set([...path, item.uid]);
+  const abilities =
+    context.abilities ?? trinketEffects(state).filter((t) => t.owner === item);
+  const events = abilities.map((ability) =>
+    activateAbility(state, ability, { ...context, path: next }),
+  );
+  if (events.length === 1 && abilities[0].id === ownerId) return events[0];
+  const event = emptyEvent(ownerId);
+  for (const part of events) {
+    event.points += part.points;
+    event.cash += part.cash;
+    event.multiplier *= part.multiplier;
+    event.steps.push(...part.steps);
+    event.flagCount += part.flagCount ?? 0;
+    event.frogCount += part.frogCount ?? 0;
+    event.snailCount += part.snailCount ?? 0;
+    event.rewardFactor *= part.rewardFactor ?? 1;
+  }
+  event.note = events
+    .map(
+      (e, i) => `${ITEMS[abilities[i].id].name}${e.note ? ": " + e.note : ""}`,
+    )
+    .join("\n");
+  return event;
+}
+
+const emptyEvent = (id) => ({
+  id,
+  points: 0,
+  cash: 0,
+  multiplier: 1,
+  steps: [],
+  note: "",
+  flagCount: 0,
+  frogCount: 0,
+  snailCount: 0,
+  rewardFactor: 1,
+});
+
+/** Resolves scoring, transformation, and reward hooks for one ability. */
+function activateAbility(state, item, context) {
+  const owner = item.owner ?? item;
+  const ownerId = owner.id;
+  if (
+    (!context.scoring || context.repeat) &&
+    [
+      "robot",
+      "monkey",
+      "anxious",
+      "numbers",
+      "octopus",
+      "realknife",
+      "crystalball",
+    ].includes(item.id)
+  )
+    recordSeen(state, [0, 1, 2, 3, 4, 5], [item]);
   const event = scoreTrinket(item, state.reels, state);
+  event.flagCount = item.id === "checkered-flag" ? 1 : 0;
+  event.frogCount = item.id === "frog" ? 1 : 0;
+  event.snailCount = item.id === "snail" ? 1 : 0;
   state.bank += event.cash;
-  /** Provides the next seeded activation roll for this item. */
   const roll = () => effectRng(state, item.id)();
   const notes = [];
-  if (["test-tube", "alembic"].includes(item.id))
-    notes.push(`Gained ${experiment(state, item).name}`);
-  if (item.id === "realknife" || item.id === "crystalball") {
-    notes.push(`${item.metadata.count}/${item.id === "realknife" ? 9 : 8}`);
+  if (EXPERIMENTS.includes(item.id) && (!context.scoring || context.repeat)) {
+    const reward = experiment(state, item);
+    if (reward) notes.push(`Gained ${reward.name}`);
   }
+  if (item.id === "realknife" || item.id === "crystalball")
+    notes.push(`${item.metadata.count}/${item.id === "realknife" ? 9 : 8}`);
   if (item.id === "constructionworker") {
     const t = state.tools[Math.floor(roll() * state.tools.length)];
     if (t) {
@@ -828,17 +1105,83 @@ function activate(state, item) {
       notes.push(`Gained ${def.name}`);
     }
   }
-  if (item.id === "bank" && state.phase === "editing") {
+  if (item.id === "bank" && (!context.scoring || context.repeat)) {
     const amount = Math.floor(state.bank * 0.1);
     state.bank += amount;
     notes.push(`+$${amount} interest`);
   }
-  if (item.id === "package" && packageMatches(state)) {
+  if (item.id === "package" && !context.scoring && packageMatches(state)) {
     openPackage(state);
     notes.push("Password matched: transformed all trinkets");
   }
+  if (item.id === "rat") {
+    item.metadata.count += state.reels
+      .map(reelValue)
+      .filter((n) => n === 3).length;
+    while (item.metadata.count >= 3) {
+      item.metadata.count -= 3;
+      notes.push(`Gained ${randomTrinket(state, ["common"]).name}`);
+    }
+    event.note = `Progress: ${item.metadata.count}/3`;
+  }
+  if (item.id === "dud") {
+    cloneTrinket(state, owner.id === "dud" ? owner : ownItem("dud"));
+    notes.push("Created a Dud");
+  }
+  if (
+    item.id === "dormant2" &&
+    state.reels.map(reelValue).every((n) => n === 7)
+  ) {
+    if (transformTrinket(state, owner, "dormant3"))
+      notes.push("Woke up as Ultimate Brainrot");
+  }
+  if (item.id === "chick") {
+    const bugs = state.trinkets.filter((t) => t.id === "bug").slice(0, 2);
+    if (bugs.length === 2 && canTransform(state, owner)) {
+      for (const bug of bugs)
+        state.trinkets.splice(state.trinkets.indexOf(bug), 1);
+      transformTrinket(state, owner, "phoenix");
+      notes.push("Ate two Bugs and became Phoenix");
+    }
+  }
+  if (item.id === "phoenix") {
+    const inventory = [
+      ...state.trinkets.filter((trinket) => trinket.id !== "phoenix"),
+    ];
+    for (const other of inventory) {
+      if (context.path.has(other.uid)) continue;
+      const repeated = activate(state, other, {
+        ...context,
+        abilities: undefined,
+        repeat: true,
+      });
+      event.points += repeated.points;
+      event.cash += repeated.cash;
+      event.steps.push(...repeated.steps);
+      event.multiplier *= repeated.multiplier;
+      event.flagCount += repeated.flagCount ?? 0;
+      event.frogCount += repeated.frogCount ?? 0;
+      event.snailCount += repeated.snailCount ?? 0;
+      event.rewardFactor =
+        (event.rewardFactor ?? 1) * (repeated.rewardFactor ?? 1);
+    }
+    transformTrinket(state, owner, "chick");
+    notes.push("Repeated all trinkets and reincarnated as Rare Chick");
+  }
+  if (context.repeat && ["confettihorn", "partyface"].includes(item.id))
+    event.rewardFactor = item.id === "confettihorn" ? 1.3 : 1.7;
+  if (
+    event.points ||
+    event.cash ||
+    event.multiplier > 1 ||
+    notes.some((note) => !/^\d+\/\d+$/.test(note)) ||
+    event.flagCount
+  )
+    markActivated(state, item);
   if (notes.length)
     event.note = [event.note, ...notes].filter(Boolean).join("\n");
+  // Copied abilities appear under their owner's name and icon.
+  event.id = ownerId;
   return event;
 }
 
@@ -847,16 +1190,29 @@ export function settleSpin(state) {
   if (state.phase !== "editing") return false;
   syncTrinkets(state);
   const snapshot = [...state.trinkets];
-  // Package resolves after the original inventory has finished scoring.
+  const effects = trinketEffects(state);
+  const regular = [],
+    silent = [];
+  for (const item of snapshot) {
+    if (!state.trinkets.includes(item)) continue;
+    const abilities = effects.filter((t) => t.owner === item);
+    const ordinary = abilities.filter(
+      (t) => t.id !== "silent" && t.id !== "octopus",
+    );
+    const quiet = abilities.filter((t) => t.id === "silent");
+    if (ordinary.length)
+      regular.push(
+        activate(state, item, { scoring: true, abilities: ordinary }),
+      );
+    if (quiet.length) silent.push({ item, abilities: quiet });
+    if (!abilities.length) regular.push(emptyEvent(item.id));
+  }
   state.events = [
     ...state.pendingEvents,
-    ...snapshot
-      .filter((item) => item.id !== "octopus")
-      .map((item) =>
-        ["bank", "package", "test-tube", "alembic"].includes(item.id)
-          ? scoreTrinket(item, state.reels, state)
-          : activate(state, item),
-      ),
+    ...regular,
+    ...silent.map(({ item, abilities }) =>
+      activate(state, item, { scoring: true, abilities }),
+    ),
   ];
   let points = state.events.reduce((sum, event) => sum + event.points, 0);
   for (const event of state.events) {
@@ -876,33 +1232,54 @@ export function settleSpin(state) {
   const multipliers = state.events.filter((event) => event.multiplier > 1);
   state.events = state.events.filter((event) => event.multiplier <= 1);
   for (const event of multipliers) {
-    event.points += event.multiplierPoints;
+    event.points += Math.round(event.multiplierPoints);
     if (event.multiplierPoints && !["moai", "new moon"].includes(event.id))
       event.steps.push({ reels: [], points: event.multiplierPoints });
     state.events.push(event);
   }
-  for (const event of state.events.filter((e) => e.id === "checkered-flag")) {
-    const extra = Math.ceil(goalFor(state.round) * 0.3);
+  for (const event of state.events.filter(
+    (e) => e.flagCount || e.id === "checkered-flag",
+  )) {
+    const extra =
+      Math.ceil(goalFor(state.round) * 0.3) * (event.flagCount || 1);
     event.points += extra;
     if (extra) event.steps.push({ reels: [], points: extra });
     points += extra;
   }
   state.events = [
-    ...state.events.filter((e) => e.id !== "checkered-flag"),
-    ...state.events.filter((e) => e.id === "checkered-flag"),
+    ...state.events.filter((e) => !e.flagCount && e.id !== "checkered-flag"),
+    ...state.events.filter((e) => e.flagCount || e.id === "checkered-flag"),
   ];
-  state.points = points;
+  state.points = Math.round(points);
   if (points < goalFor(state.round)) {
-    for (const event of state.events.filter((e) => e.id === "snail")) {
-      const reward = randomTrinket(state, ["common", "uncommon"]);
-      if (reward && event) event.note = `Gained ${reward.name}`;
+    for (const event of state.events) {
+      for (let i = 0; i < (event.snailCount ?? 0); i++) {
+        const reward = randomTrinket(state, ["common", "uncommon"]);
+        event.note = [event.note, `Gained ${reward.name}`]
+          .filter(Boolean)
+          .join("\n");
+        const owner = snapshot.find((t) => t.id === event.id);
+        if (owner) markActivated(state, owner);
+      }
     }
   }
+  const rewardFactor =
+    1.3 ** count(state, "confettihorn") *
+    1.7 ** count(state, "partyface") *
+    state.events.reduce(
+      (factor, event) => factor * (event.rewardFactor ?? 1),
+      1,
+    );
+  const goalReward = Math.ceil(bonusFor(state.round) * rewardFactor);
   const bonus =
     points >= goalFor(state.round)
-      ? bonusFor(state.round) + 50 * state.reels.filter((n) => n === "W").length
+      ? goalReward + 50 * state.reels.filter((n) => n === "W").length
       : 0;
-  let runningBonus = points >= goalFor(state.round) ? bonusFor(state.round) : 0;
+  if (bonus) {
+    passiveActivated(state, "confettihorn");
+    passiveActivated(state, "partyface");
+  }
+  let runningBonus = points >= goalFor(state.round) ? goalReward : 0;
   state.reels.forEach((value, index) => {
     if (value !== "W") return;
     const extra = points >= goalFor(state.round) ? 50 : 0;
@@ -921,6 +1298,17 @@ export function settleSpin(state) {
   });
   state.bank += bonus + allowanceFor(state.round);
   state.total += points;
+  for (const event of state.events) {
+    for (let i = 0; i < (event.frogCount ?? 0); i++) {
+      const interest = Math.ceil(state.total * 0.02);
+      state.total += interest;
+      event.totalPoints = (event.totalPoints ?? 0) + interest;
+      event.note = `+${event.totalPoints} interest on total score`;
+      event.steps.push({ reels: [], points: interest, totalOnly: true });
+      const owner = snapshot.find((t) => t.id === event.id);
+      if (owner && interest) markActivated(state, owner);
+    }
+  }
   state.history.push({
     round: state.round,
     reels: [...state.reels],
@@ -947,6 +1335,7 @@ function choose(pool, rng, boost = 1) {
   /** Computes the boosted rarity weight for one candidate. */
   const rarityWeight = (def) =>
     RARITIES[def.rarity].weight *
+    (def.id === "dud" ? 0.1 : 1) *
     (["rare", "legendary"].includes(def.rarity) ? boost : 1);
   const weight = pool.reduce(
     (sum, def) =>
@@ -990,10 +1379,14 @@ function chooseShopItem(catalog, pool, rng, weightFor) {
 }
 
 /** Uses fixed catalog rarity counts so ownership cannot redistribute item weights. */
-function shopItemWeight(def, boost) {
+function shopItemWeight(def, boost, state = null) {
   const catalog = def.kind === "tool" ? TOOLS : availableTrinkets;
   return (
     (RARITIES[def.rarity].weight *
+      (def.id === "dud" ? 0.1 : 1) *
+      (state && EXPERIMENTS.includes(def.id)
+        ? 10 ** count(state, "scientist")
+        : 1) *
       (["rare", "legendary"].includes(def.rarity) ? boost : 1)) /
     catalog.filter((item) => item.rarity === def.rarity).length
   );
@@ -1020,13 +1413,13 @@ export function generateOffers(state) {
       availableTrinkets,
       availableTrinkets.filter(
         (t) =>
-          !owned.has(t.id) &&
+          canOffer(state, t.id) &&
           !offers.some((o) => o.id === t.id) &&
           (!(state.legendaryShops > 0 && slot === 0) ||
             t.rarity === "legendary"),
       ),
       rng,
-      (def) => shopItemWeight(def, boost),
+      (def) => shopItemWeight(def, boost, state),
     );
     offers.push(
       def
@@ -1053,10 +1446,10 @@ export function generateOffers(state) {
   const trinket = chooseShopItem(
     availableTrinkets,
     availableTrinkets.filter(
-      (t) => !owned.has(t.id) && !offers.some((o) => o.id === t.id),
+      (t) => canOffer(state, t.id) && !offers.some((o) => o.id === t.id),
     ),
     rng,
-    (def) => shopItemWeight(def, boost),
+    (def) => shopItemWeight(def, boost, state),
   );
   const mixed = offerTool ? tool : trinket;
   const kind = offerTool ? "tool" : "trinket";
@@ -1221,6 +1614,7 @@ export function buy(state, index) {
 export function rerollShop(state) {
   if (state.phase !== "shop" || state.bank < rerollPrice(state)) return false;
   state.bank -= rerollPrice(state);
+  state.bank += 9 * count(state, "ferriswheel");
   state.rerolls++;
   state.offers = generateOffers(state);
   return true;

@@ -35,6 +35,7 @@ import {
 import { BackgroundMusic, GameAudio } from "./audio.js";
 import { animateCount } from "./animation.js";
 import { divisibilityStatus } from "./scoring.js";
+import { trinketStacks } from "./effects.js";
 
 const sound = new GameAudio();
 const recordPlayer = document.querySelector("#record-player");
@@ -285,7 +286,6 @@ function readSave() {
     if (
       !Array.isArray(data.trinkets) ||
       !Array.isArray(data.tools) ||
-      !data.trinkets.length ||
       !data.tools.length
     )
       return null;
@@ -294,7 +294,7 @@ function readSave() {
         (t) =>
           ITEMS[t.id]?.kind === "trinket" &&
           t.metadata &&
-          Object.values(t.metadata).every(Number.isFinite),
+          Object.values(t.metadata).every((value) => value === null || Number.isFinite(value)),
       )
     )
       return null;
@@ -306,7 +306,8 @@ function readSave() {
           t.maxUses > 0 &&
           Number.isInteger(t.uses) &&
           t.uses >= 0 &&
-          Number.isFinite(t.uses),
+          Number.isFinite(t.uses) &&
+          (t.savedValue == null || (Number.isInteger(t.savedValue) && t.savedValue >= 0 && t.savedValue <= 9)),
       )
     )
       return null;
@@ -565,13 +566,10 @@ function stats() {
 function inventory() {
   const sections = ["trinkets", "tools"]
     .map((kind) => {
-      const items = state[kind]
-        .map((item, index) => {
-          if (
-            kind === "trinkets" &&
-            state.trinkets.findIndex((t) => t.id === item.id) !== index
-          )
-            return "";
+      const visible = kind === "trinkets" ? trinketStacks(state) : state.tools;
+      const items = visible
+        .map((item) => {
+          const index = state[kind].indexOf(item);
           const copies =
             kind === "trinkets"
               ? state.trinkets.filter((t) => t.id === item.id).length
@@ -745,10 +743,10 @@ function offers(animateSpawn = false) {
 
 /** Returns one scoring-event row for the animated score log. */
 function logRow(event, pending = false) {
-  const isCashBonus = ["w", "octopus"].includes(event.id);
+  const isCashBonus = event.cashOnly || ["w", "octopus"].includes(event.id);
   const isMessageEvent = Boolean(event.message);
   return `
-    <div class="log-row ${event.points || event.multiplier > 1 || isCashBonus || isMessageEvent ? "" : "missed"}">
+    <div class="log-row ${event.points || event.totalPoints || event.cash || event.multiplier > 1 || isCashBonus || isMessageEvent ? "" : "missed"}">
       <img src="${iconPath(event.id)}" alt="" width="52" height="52">
       <div>
         <span class="log-name">
@@ -757,7 +755,7 @@ function logRow(event, pending = false) {
         ${
           isMessageEvent
             ? `<span class="log-message">${esc(event.message)}</span>`
-            : `+${isCashBonus ? "$" : ""}<span class="log-points">${number(pending ? (event.previewPoints ?? 0) : isCashBonus ? event.cash : event.points)}</span>`
+            : `+${isCashBonus ? "$" : ""}<span class="log-points">${number(pending ? (event.previewPoints ?? 0) : isCashBonus ? event.cash : event.points + (event.totalPoints ?? 0))}</span>`
         }
         ${event.note ? `<small class="log-note" ${pending ? "hidden" : ""}>${esc(event.note)}</small>` : ""}
       </div>
@@ -830,7 +828,11 @@ function renderGame({ animateOffers = false } = {}) {
                   : "choose a trinket"
                 : def.target === "tool"
                   ? "choose another tool"
-                  : "choose a reel"
+                  : def.id === "jar"
+                    ? state.tools.find((t) => t.id === "jar")?.savedValue != null
+                      ? "choose a reel for your saved number"
+                      : "choose a number to save for a later use"
+                    : "choose a reel"
           }
           <button data-action="cancel-tool">cancel</button>
         `;
@@ -1144,11 +1146,11 @@ async function doScore() {
     const ledger = row.querySelector(".log-points");
     row.classList.add("scoring-active");
     log.scrollTop = log.scrollHeight;
-    if (["w", "octopus"].includes(event.id) || event.message) {
+    if (event.cashOnly || ["w", "octopus"].includes(event.id) || event.message) {
       for (const index of event.reels ?? [])
         if (!reducedMotion.matches)
           reelNodes[index].classList.add("scoring-hit");
-      if (["w", "octopus"].includes(event.id)) {
+      if (event.cashOnly || ["w", "octopus"].includes(event.id)) {
         row.querySelector(".log-points").textContent = number(event.cash);
         if (event.id === "w" && event.cash)
           subtitle.textContent = `goal bonus: +$${number(event.bonusTotal)}!`;
@@ -1169,7 +1171,7 @@ async function doScore() {
               reels: event.reels ?? [],
               points: event.points - event.previewPoints,
             },
-          ].filter((step) => step.points !== 0)
+          ].filter((step) => step.points !== 0).concat((event.steps ?? []).filter((step) => step.totalOnly))
         : (event.steps ??
           (event.points ? [{ reels: [], points: event.points }] : []));
     for (const step of steps) {
@@ -1195,7 +1197,7 @@ async function doScore() {
         /** Updates the visible ledger and totals for this animation frame. */
         update(value) {
           ledger.textContent = number(value);
-          ui.displayPoints = pointsBefore + value - previous;
+          ui.displayPoints = pointsBefore + (step.totalOnly ? 0 : value - previous);
           ui.displayTotal = totalBefore + value - previous;
           pointsNode.textContent = number(ui.displayPoints);
           totalNode.textContent = number(ui.displayTotal);

@@ -24,3 +24,10 @@ butterfly,Butterfly,butterfly,Permanently change a trinket into another of the s
 sparkles,Sparkles,sparkles,Permanently change a trinket into another with one higher rarity.,1,Rare,TRUE
 incrementall,Increment All,fast up button,Add 1 to ALL reels (9 becomes 0).,1,Uncommon,
 decrementall,Decrement All,fast down button,Subtract 1 from ALL reels (0 becomes 9).,1,Uncommon,
+pawn,Pawn,pawn,Sell a trinket for $10.,1,Rare,,
+jar,Jar,jar,Pick a number to save for later.,1,Rare,,
+dna,DNA,dna,Permanently duplicate a Common or Uncommon trinket.,1,Legendary,,
+magicwand,Magic Wand,magic wand,Permanently transform a trinket into a Frog that adds 2% interest to your TOTAL score after each spin. (Frogs are also immune to science!),1,Rare,,
+razor,Shaving Razor,razor,Spend $30 to permanently remove a slot from a reel (Blades are expensive!),1,Legendary,,(Reduced initial cost)
+trollingstone,Rolling Stone,stone,Permanently remove a slot from a reel that is 2 or less.,1,Rare,,
+cutdown,Cut Down to Size,saw,Permanently remove a slot from a reel that is 7 or more.,1,Rare,,

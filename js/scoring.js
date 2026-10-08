@@ -1,10 +1,13 @@
 import { ITEMS } from "./items.js";
 import { hash, random } from "./random.js";
+import { trinketEffects, markActivated } from "./effects.js";
 
 /** Each copy independently reduces the chance of no double trigger by 68%. */
 export const eightBallHits = (state, rng) => {
-  const copies = state?.trinkets.filter((t) => t.id === "eightball").length ?? 0;
-  return 1 + Number(rng() < 1 - 0.32 ** copies);
+  const copies = trinketEffects(state).filter((t) => t.id === "eightball");
+  const extra = rng() < 1 - 0.32 ** copies.length;
+  if (extra) copies.forEach((item) => markActivated(state, item));
+  return 1 + Number(extra);
 };
 
 /** Checks whether a reel value is an ordinary digit from zero through nine. */
@@ -41,7 +44,11 @@ export function scoreTrinket(item, reels, state = null) {
     { length: 10 },
     (_, n) => reels.filter((d) => d === n).length,
   );
-  const eightRng = random(hash(`${state?.seed ?? 0}:eightball-score:${state?.round ?? 0}:${id}:${JSON.stringify(reels)}`));
+  const eightRng = random(
+    hash(
+      `${state?.seed ?? 0}:eightball-score:${state?.round ?? 0}:${id}:${JSON.stringify(reels)}`,
+    ),
+  );
   const eight = () => eightBallHits(state, eightRng);
   let cash = 0,
     multiplier = 1,
@@ -178,11 +185,42 @@ export function scoreTrinket(item, reels, state = null) {
       );
       break;
     case "brainrot3":
-      flat(
-        reels.every((n) => n === 6 || n === 7),
-        670,
-      );
+      if (reels.length && reels.every((n) => n === 6 || n === 7))
+        multiplier = 67;
       break;
+    case "dormant3":
+      multiplier =
+        67 ** reels.filter((n, i) => n === 6 && reels[i + 1] === 7).length;
+      break;
+    case "chick":
+      flat(true, 200);
+      break;
+    case "abacus":
+      if (state?.toolsUsed === 5) cash = 45;
+      break;
+    case "mechanic":
+      cash = Math.max(0, 100 - 7 * (state?.toolsUsed ?? 0));
+      break;
+    case "liberty":
+      reels.forEach((n) => {
+        if (isDigit(n) && n === item.metadata.favorite)
+          cash += 20 * (n === 8 ? eight() : 1);
+      });
+      break;
+    case "silent": {
+      const silentOwners = new Set(
+        trinketEffects(state)
+          .filter((t) => t.id === "silent")
+          .map((t) => t.owner),
+      );
+      multiplier =
+        1.2 **
+        (state?.trinkets.filter(
+          (t) =>
+            !silentOwners.has(t) && !state.activatedTrinkets?.includes(t.uid),
+        ).length ?? 0);
+      break;
+    }
     case "seven":
       // Pay for final-board sevens on each activation, without accumulating power.
       cash = counts[7] * 7;
@@ -344,7 +382,11 @@ export function scoreTrinket(item, reels, state = null) {
       for (const i of all.filter(
         (index) => isDigit(favorite) && reels[index] === favorite,
       ))
-        for (let hit = 0, hits = favorite === 8 ? eight() : 1; hit < hits; hit++)
+        for (
+          let hit = 0, hits = favorite === 8 ? eight() : 1;
+          hit < hits;
+          hit++
+        )
           steps.push({ reels: [i], points: 0 });
       multiplier = 3 ** steps.length;
       steps.forEach((step, index) => {
@@ -396,6 +438,24 @@ export function scoreTrinket(item, reels, state = null) {
     case "package":
     case "bank":
     case "wheel":
+    case "anxious":
+    case "numbers":
+    case "parrot":
+    case "scientist":
+    case "dormant1":
+    case "dormant2":
+    case "fax":
+    case "confettihorn":
+    case "partyface":
+    case "dud":
+    case "rat":
+    case "upgradeexp":
+    case "toolexp":
+    case "frog":
+    case "fallingleaves":
+    case "phoenix":
+    case "monkey":
+    case "ferriswheel":
       break;
     default:
       throw new Error(`Missing trinket effect: ${id}`);
@@ -403,7 +463,8 @@ export function scoreTrinket(item, reels, state = null) {
   if (id !== "seven" && item.metadata.power != null)
     note = `Power: ${item.metadata.power}`;
   if (cash) note += `${note ? ": " : ""}+$${cash}`;
-  if (multiplier > 1) note += `${note ? ": " : ""}×${multiplier} round score`;
+  if (multiplier > 1)
+    note += `${note ? ": " : ""}×${Math.round(multiplier)} round score`;
   return {
     id,
     points: steps.reduce((sum, s) => sum + s.points, 0),
