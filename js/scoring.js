@@ -219,7 +219,7 @@ export function scoreTrinket(item, reels, state = null) {
     case "liberty":
       reels.forEach((n) => {
         if (isDigit(n) && n === item.metadata.favorite)
-          cash += 20 * (n === 8 ? eight() : 1);
+          cash += 12 * (n === 8 ? eight() : 1);
       });
       break;
     case "silent": {

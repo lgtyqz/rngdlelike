@@ -1072,7 +1072,7 @@ export const TRINKETS = [
     rarity: "rare",
     effect: "liberty",
     description:
-      "Picks a favorite number every time you spin. Gives you $20 each time you score Lady Liberty's favorite number.",
+      "Picks a favorite number every time you spin. Gives you $15 each time you score Lady Liberty's favorite number.",
     kind: "trinket",
     metadata: {
       favorite: 0,
