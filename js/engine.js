@@ -1,4 +1,8 @@
 import {
+  asScore, ratio, addRatio, multiplyRatio, powerRatio, roundRatio, compareRatio,
+  hasMultiplier, formatRatio, formatNumber, normalizeScores,
+} from "./score.js";
+import {
   ITEMS,
   TRINKETS,
   TOOLS,
@@ -125,8 +129,8 @@ export function createRun(seed, mode = "normal", date = null) {
     round: 1,
     phase: "ready",
     bank: 10,
-    total: 0,
-    points: 0,
+    total: 0n,
+    points: 0n,
     reels: [0, 1, 2, 3, 4, 5],
     trinkets: [],
     tools: [],
@@ -191,13 +195,15 @@ export const reelLabel = (value) =>
 
 /** Reconnects clone metadata after loading JSON and before applying effects. */
 export function syncTrinkets(state) {
+  normalizeScores(state);
   const metadata = new Map();
   for (const item of state.trinkets) {
     item.uid ??= state.nextTrinketUid = (state.nextTrinketUid ?? 0) + 1;
     state.nextTrinketUid = Math.max(state.nextTrinketUid ?? 0, item.uid);
     item.metadata ??= {};
     for (const [key, value] of Object.entries(ITEMS[item.id].metadata ?? {}))
-      if (!(key in item.metadata)) item.metadata[key] = value;
+      if (!(key in item.metadata))
+        item.metadata[key] = key === "power" ? asScore(value) : value;
     // Lucky Seven no longer grows power; discard that field from older saves.
     if (item.id === "package")
       item.metadata.password = Number(
@@ -238,9 +244,9 @@ function transformTrinket(state, item, id) {
     if (state.phase === "editing")
       state.pendingEvents.push({
         id: leaf.owner.id,
-        points: 0,
+        points: 0n,
         cash: 30,
-        multiplier: 1,
+        multiplier: ratio(1),
         note: "+$30 for a transformation",
         steps: [],
         cashOnly: true,
@@ -303,9 +309,9 @@ function favorite(state) {
 function recordBombEvent(state, index, message, cash = 0) {
   const event = {
     id: "bomb",
-    points: 0,
+    points: 0n,
     cash,
-    multiplier: 1,
+    multiplier: ratio(1),
     reels: [index],
     message,
     steps: [],
@@ -438,9 +444,9 @@ function recordSeen(state, indices, abilities = null) {
         });
         state.pendingEvents.push({
           id: item.owner.id,
-          points: 0,
+          points: 0n,
           cash: 2,
-          multiplier: 1,
+          multiplier: ratio(1),
           note: `+$4 · Favorite: ${item.metadata.favorite}`,
           steps: [],
           cashOnly: true,
@@ -448,11 +454,11 @@ function recordSeen(state, indices, abilities = null) {
       }
       if (item.id === "robot" && (value === 0 || value === 1)) {
         markActivated(state, item);
-        item.metadata.power += 2;
+        item.metadata.power += 2n;
         state.seenEvents.push({
           index,
           id: item.id,
-          note: `+1 P0W3R: N3W P0W3R: ${item.metadata.power}`,
+          note: `+1 P0W3R: N3W P0W3R: ${formatNumber(item.metadata.power)}`,
         });
       }
       if (item.id === "octopus" && value === 8) {
@@ -470,9 +476,9 @@ function recordSeen(state, indices, abilities = null) {
             abilityId: "octopus",
             ownerUid: item.owner.uid,
             cashOnly: true,
-            points: 0,
+            points: 0n,
             cash: 0,
-            multiplier: 1,
+            multiplier: ratio(1),
             reels: [],
             steps: [],
           };
@@ -498,8 +504,8 @@ function recordSeen(state, indices, abilities = null) {
           notes.push("Legendary reserved");
           state.pendingEvents.push({
             id: "realknife",
-            points: 0,
-            multiplier: 1,
+            points: 0n,
+            multiplier: ratio(1),
             message,
             reels: [index],
             steps: [],
@@ -553,25 +559,26 @@ export function chooseQubit(state, index) {
 function previewCameraPoints(state) {
   let points = state.pendingEvents.reduce(
     (sum, event) => sum + event.points,
-    0,
+    0n,
   );
   for (const event of state.pendingEvents) {
     event.previewPoints = event.points;
-    if (event.multiplier > 1) {
-      const extra = points * (event.multiplier - 1);
-      event.previewPoints += extra;
-      points += extra;
+    if (hasMultiplier(event.multiplier)) {
+      const after = multiplyRatio(points, event.multiplier);
+      event.previewPoints += roundRatio(after) - roundRatio(points);
+      points = after;
     }
   }
   for (const event of state.pendingEvents.filter(
     (event) => event.flagCount || event.id === "checkered-flag",
   )) {
-    const extra =
-      Math.ceil(goalFor(state.round) * 0.3) * (event.flagCount || 1);
+    const extra = BigInt(
+      Math.ceil(goalFor(state.round) * 0.3) * (event.flagCount || 1),
+    );
     event.previewPoints += extra;
-    points += extra;
+    points = addRatio(points, extra);
   }
-  state.points = points;
+  state.points = roundRatio(points);
 }
 
 /** Validates and applies a tool, spending a use only after a successful action. */
@@ -857,7 +864,7 @@ export function useTool(state, id, target, source = null) {
       const event = activate(state, item);
       cameraEvent = event;
       if (item.id === "no-tools") {
-        event.points = 0;
+        event.points = 0n;
         event.steps = [];
       }
       if (item.id !== "octopus") state.pendingEvents.push(event);
@@ -1049,7 +1056,7 @@ function activate(state, item, context = {}) {
   const copiedLines = [];
   for (const [index, part] of events.entries()) {
     const details = [
-      part.points ? `+${part.points} points` : "",
+      part.points ? `+${formatNumber(part.points)} points` : "",
       part.note.replace(/\n/g, " · "),
     ]
       .filter(Boolean)
@@ -1059,16 +1066,16 @@ function activate(state, item, context = {}) {
     );
     event.points += part.points;
     event.cash += part.cash;
-    event.multiplier *= part.multiplier;
+    event.multiplier = multiplyRatio(event.multiplier, part.multiplier);
     // Reveal each copied trinket on its own line as its contributions animate.
     event.steps.push(
-      ...(part.steps.length ? part.steps : [{ reels: [], points: 0 }]).map(
+      ...(part.steps.length ? part.steps : [{ reels: [], points: 0n }]).map(
         (step) => ({ ...step, note: copiedLines.join("\n") }),
       ),
     );
     event.flagCount += part.flagCount ?? 0;
     event.snailCount += part.snailCount ?? 0;
-    event.rewardFactor *= part.rewardFactor ?? 1;
+    event.rewardBonus += part.rewardBonus ?? 0;
     event.silentCount += part.silentCount ?? 0;
     event.silentOwnerUids.push(...(part.silentOwnerUids ?? []));
     event.snailOwnerUids.push(...(part.snailOwnerUids ?? []));
@@ -1083,14 +1090,14 @@ function activate(state, item, context = {}) {
 
 const emptyEvent = (id) => ({
   id,
-  points: 0,
+  points: 0n,
   cash: 0,
-  multiplier: 1,
+  multiplier: ratio(1),
   steps: [],
   note: "",
   flagCount: 0,
   snailCount: 0,
-  rewardFactor: 1,
+  rewardBonus: 0,
   silentCount: 0,
   silentOwnerUids: [],
   snailOwnerUids: [],
@@ -1105,7 +1112,9 @@ function phoenixRanking(state) {
     const uids = event.silentCount ? event.silentOwnerUids : [event.ownerUid];
     for (const uid of uids) {
       if (uid == null) continue;
-      points.set(uid, (points.get(uid) ?? 0) + event.points / uids.length);
+      points.set(uid, addRatio(
+        points.get(uid) ?? 0n, ratio(event.points, BigInt(uids.length)),
+      ));
     }
   }
   const phoenixOwners = new Set(
@@ -1116,11 +1125,11 @@ function phoenixRanking(state) {
   return state.trinkets
     .map((item, index) => ({
       uid: item.uid,
-      points: points.get(item.uid) ?? 0,
+      points: points.get(item.uid) ?? ratio(0),
       index,
     }))
     .filter((item) => !phoenixOwners.has(item.uid))
-    .sort((a, b) => b.points - a.points || a.index - b.index)
+    .sort((a, b) => compareRatio(b.points, a.points) || a.index - b.index)
     .map((item) => item.uid);
 }
 
@@ -1242,11 +1251,11 @@ function activateAbility(state, item, context) {
       event.points += repeated.points;
       event.cash += repeated.cash;
       event.steps.push(...repeated.steps);
-      event.multiplier *= repeated.multiplier;
+      event.multiplier = multiplyRatio(event.multiplier, repeated.multiplier);
       event.flagCount += repeated.flagCount ?? 0;
       event.snailCount += repeated.snailCount ?? 0;
-      event.rewardFactor =
-        (event.rewardFactor ?? 1) * (repeated.rewardFactor ?? 1);
+      event.rewardBonus =
+        (event.rewardBonus ?? 0) + (repeated.rewardBonus ?? 0);
       event.silentCount =
         (event.silentCount ?? 0) + (repeated.silentCount ?? 0);
       (event.silentOwnerUids ??= []).push(...(repeated.silentOwnerUids ?? []));
@@ -1259,11 +1268,11 @@ function activateAbility(state, item, context) {
     );
   }
   if (context.repeat && ["confettihorn", "partyface"].includes(item.id))
-    event.rewardFactor = item.id === "confettihorn" ? 1.3 : 1.7;
+    event.rewardBonus = item.id === "confettihorn" ? 30 : 70;
   if (
     event.points ||
     event.cash ||
-    event.multiplier > 1 ||
+    hasMultiplier(event.multiplier) ||
     notes.some((note) => !/^\d+\/\d+$/.test(note)) ||
     event.flagCount
   )
@@ -1324,25 +1333,26 @@ export function settleSpin(state, { skipPhoenix = false } = {}) {
     }
     return !event.deferredSilent;
   });
-  let points = state.events.reduce((sum, event) => sum + event.points, 0);
+  let points = ratio(state.events.reduce((sum, event) => sum + event.points, 0n));
   for (const event of state.events) {
-    if (event.multiplier > 1) {
+    if (hasMultiplier(event.multiplier)) {
       const before = points;
       // Multipliers appear at the end, after all additive contributions.
       if (["moai", "new moon"].includes(event.id)) {
         const factor = event.id === "moai" ? 3 : 4;
         for (const step of event.steps) {
-          step.points = points * (factor - 1);
-          points *= factor;
+          const after = multiplyRatio(points, factor);
+          step.points = roundRatio(after) - roundRatio(points);
+          points = after;
         }
-      } else points *= event.multiplier;
-      event.multiplierPoints = points - before;
+      } else points = multiplyRatio(points, event.multiplier);
+      event.multiplierPoints = roundRatio(points) - roundRatio(before);
     }
   }
-  const multipliers = state.events.filter((event) => event.multiplier > 1);
-  state.events = state.events.filter((event) => event.multiplier <= 1);
+  const multipliers = state.events.filter((event) => hasMultiplier(event.multiplier));
+  state.events = state.events.filter((event) => !hasMultiplier(event.multiplier));
   for (const event of multipliers) {
-    event.points += Math.round(event.multiplierPoints);
+    event.points += event.multiplierPoints;
     if (event.multiplierPoints && !["moai", "new moon"].includes(event.id))
       event.steps.push({ reels: [], points: event.multiplierPoints });
     state.events.push(event);
@@ -1350,27 +1360,28 @@ export function settleSpin(state, { skipPhoenix = false } = {}) {
   for (const event of state.events.filter(
     (e) => e.flagCount || e.id === "checkered-flag",
   )) {
-    const extra =
-      Math.ceil(goalFor(state.round) * 0.3) * (event.flagCount || 1);
+    const extra = BigInt(
+      Math.ceil(goalFor(state.round) * 0.3) * (event.flagCount || 1),
+    );
     event.points += extra;
     if (extra) event.steps.push({ reels: [], points: extra });
-    points += extra;
+    points = addRatio(points, extra);
   }
   state.events = [
     ...state.events.filter((e) => !e.flagCount && e.id !== "checkered-flag"),
     ...state.events.filter((e) => e.flagCount || e.id === "checkered-flag"),
   ];
   // Goal-dependent trinkets decide whether to trigger before Silent changes the score.
-  const triggerPoints = points;
-  const triggeredGoal = triggerPoints >= goalFor(state.round);
-  const rewardFactor = triggeredGoal
-    ? 1.3 ** effects.filter((t) => t.id === "confettihorn").length *
-      1.7 ** effects.filter((t) => t.id === "partyface").length *
+  const triggerPoints = roundRatio(points);
+  const triggeredGoal = compareRatio(points, goalFor(state.round)) >= 0;
+  const rewardPercent = triggeredGoal
+    ? 100 + 30 * effects.filter((t) => t.id === "confettihorn").length +
+      70 * effects.filter((t) => t.id === "partyface").length +
       state.events.reduce(
-        (factor, event) => factor * (event.rewardFactor ?? 1),
-        1,
+        (bonus, event) => bonus + (event.rewardBonus ?? 0),
+        0,
       )
-    : 1;
+    : 100;
   for (const effect of effects) {
     if (triggeredGoal && ["confettihorn", "partyface"].includes(effect.id))
       markActivated(state, effect);
@@ -1411,26 +1422,26 @@ export function settleSpin(state, { skipPhoenix = false } = {}) {
   const inactiveCount = stacks.reduce((sum, stack) => sum + stack.count, 0);
   for (const event of deferred.values()) {
     event.silentStacks = stacks.map((stack) => ({ ...stack }));
-    event.multiplier = 1.1 ** (inactiveCount * event.silentCount);
+    event.multiplier = powerRatio(1.1, inactiveCount * event.silentCount);
     const before = points;
     const lines = [];
     for (const [index, stack] of stacks.entries()) {
-      const factor = 1.1 ** (stack.count * event.silentCount);
+      const factor = powerRatio(1.1, stack.count * event.silentCount);
       const name = `${ITEMS[stack.id].name}${stack.count > 1 ? ` ×${stack.count}` : ""}`;
-      const line = `${name}: didn't trigger · ×${Number(factor.toPrecision(10))}`;
+      const line = `${name}: didn't trigger · ×${formatRatio(factor)}`;
       lines.push(line);
       const after =
         index === stacks.length - 1
-          ? before * event.multiplier
-          : points * factor;
+          ? multiplyRatio(before, event.multiplier)
+          : multiplyRatio(points, factor);
       event.steps.push({
         reels: [],
-        points: after - points,
+        points: roundRatio(after) - roundRatio(points),
         note: lines.join("\n"),
       });
       points = after;
     }
-    event.points = points - before;
+    event.points = roundRatio(points) - roundRatio(before);
     event.note = lines.length
       ? lines.join("\n")
       : "All eligible trinkets activated.";
@@ -1439,9 +1450,9 @@ export function settleSpin(state, { skipPhoenix = false } = {}) {
     state.events.push(event);
   }
   // Round once after all multipliers so totals, history, and rewards agree.
-  points = Math.round(points);
+  points = roundRatio(points);
   state.points = points;
-  const goalReward = Math.ceil(bonusFor(state.round) * rewardFactor);
+  const goalReward = Math.ceil(bonusFor(state.round) * rewardPercent / 100);
   const bonus =
     points >= goalFor(state.round)
       ? goalReward + 50 * state.reels.filter((n) => n === "W").length
@@ -1453,7 +1464,7 @@ export function settleSpin(state, { skipPhoenix = false } = {}) {
     runningBonus += extra;
     state.events.push({
       id: "w",
-      points: 0,
+      points: 0n,
       cash: extra,
       note: extra
         ? `Goal bonus increased by ${extra}`
@@ -1672,7 +1683,7 @@ export function refreshShopOffers(state) {
 export function enterShop(state) {
   if (state.phase !== "scored" || state.round >= TOTAL_SPINS) return false;
   state.round++;
-  state.points = 0;
+  state.points = 0n;
   state.rerolls = 0;
   state.toolRolls = 0;
   state.phase = "shop";
@@ -1798,5 +1809,5 @@ export function shareText(state, url, calendar = {}) {
         .join("") + (ranked.length > 5 ? ` (+${ranked.length - 5} more)` : "")
     );
   };
-  return `RNGdlelike - ${heading}\n${state.total.toLocaleString("en-US")} points in ${state.history.length}/20 spins!\nGoals: ${state.history.filter((h) => h.bonus).length}/20 - Best spin: ${Math.max(0, ...state.history.map((h) => h.points))}\nTrinkets: ${summary(state.trinkets)}\nTools: ${summary(state.tools)}\nThink you can beat me? Play the same seed!\n${url}`;
+  return `RNGdlelike - ${heading}\n${formatNumber(state.total)} points in ${state.history.length}/20 spins!\nGoals: ${state.history.filter((h) => h.bonus).length}/20 - Best spin: ${formatNumber(state.history.reduce((best, h) => asScore(h.points) > best ? asScore(h.points) : best, 0n))}\nTrinkets: ${summary(state.trinkets)}\nTools: ${summary(state.tools)}\nThink you can beat me? Play the same seed!\n${url}`;
 }

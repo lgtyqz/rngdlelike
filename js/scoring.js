@@ -1,6 +1,9 @@
 import { ITEMS } from "./items.js";
 import { hash, random } from "./random.js";
 import {
+  asScore, ratio, powerRatio, hasMultiplier, formatRatio, formatNumber,
+} from "./score.js";
+import {
   trinketEffects,
   markActivated,
   inactiveTrinketStacks,
@@ -36,6 +39,7 @@ export function divisibilityStatus(id, reels) {
 
 // Contributions retain reel indices so the scoring animation reflects the actual rule.
 export function scoreTrinket(item, reels, state = null) {
+  if (item.metadata.power != null) item.metadata.power = asScore(item.metadata.power);
   // Bombs retain their tagged value in game state so they can count down and
   // render specially, but every scoring rule treats the countdown as a digit.
   reels = reels.map(reelValue);
@@ -55,10 +59,11 @@ export function scoreTrinket(item, reels, state = null) {
   );
   const eight = () => eightBallHits(state, eightRng);
   let cash = 0,
-    multiplier = 1,
+    multiplier = ratio(1),
     note = "";
   /** Records a scoring contribution, repeating eight-related hits for each Eight Ball multiplier. */
   const add = (indices, points, repeat = true) => {
+    points = asScore(points);
     if (points > 0) {
       steps.push({ reels: indices, points });
       if (repeat && indices.some((i) => reels[i] === 8))
@@ -98,15 +103,15 @@ export function scoreTrinket(item, reels, state = null) {
       break;
     case "new moon":
       for (const i of all.filter((index) => !isDigit(reels[index])))
-        steps.push({ reels: [i], points: 0 });
-      multiplier = 4 ** steps.length;
+        steps.push({ reels: [i], points: 0n });
+      multiplier = powerRatio(4, steps.length);
       steps.forEach((step, index) => {
         step.note = `Grey slot: ×4 (${index + 1}/${steps.length})`;
       });
       break;
     case "waningcrescent":
       for (const i of all.filter((index) => !isDigit(reels[index])))
-        steps.push({ reels: [i], points: 0 });
+        steps.push({ reels: [i], points: 0n });
       flat(true, 200 * steps.length);
       steps.forEach((step, index) => {
         step.note = `Grey slot: +200 (${index + 1}/${steps.length})`;
@@ -172,7 +177,7 @@ export function scoreTrinket(item, reels, state = null) {
         (n) => n === 1,
         () => {
           const p = item.metadata.power;
-          item.metadata.power += 5;
+          item.metadata.power += 5n;
           return p;
         },
       );
@@ -198,11 +203,11 @@ export function scoreTrinket(item, reels, state = null) {
       break;
     case "brainrot3":
       if (reels.length && reels.every((n) => n === 6 || n === 7))
-        multiplier = 6.7;
+        multiplier = ratio(6.7);
       break;
     case "dormant3":
       multiplier =
-        67 ** reels.filter((n, i) => n === 6 && reels[i + 1] === 7).length;
+        powerRatio(67, reels.filter((n, i) => n === 6 && reels[i + 1] === 7).length);
       break;
     case "chick":
       flat(true, 200);
@@ -224,7 +229,7 @@ export function scoreTrinket(item, reels, state = null) {
       break;
     case "silent": {
       const stacks = state ? inactiveTrinketStacks(state) : [];
-      multiplier = 1.1 ** stacks.reduce((sum, stack) => sum + stack.count, 0);
+      multiplier = powerRatio(1.1, stacks.reduce((sum, stack) => sum + stack.count, 0));
       note = stacks
         .map(
           (stack) =>
@@ -239,7 +244,7 @@ export function scoreTrinket(item, reels, state = null) {
       break;
     case "hotface":
     case "coldface": {
-      const amount = 3;
+      const amount = 3n;
       each(
         (n) =>
           id === "hotface"
@@ -367,13 +372,13 @@ export function scoreTrinket(item, reels, state = null) {
     case "three": {
       add([], item.metadata.power, false);
       if (divisibilityStatus(id, reels).triggers) {
-        if (id === "heaven") item.metadata.power *= 2;
-        else item.metadata.power += id === "rabbit" ? 77 : 13;
+        if (id === "heaven") item.metadata.power *= 2n;
+        else item.metadata.power += id === "rabbit" ? 77n : 13n;
       }
       break;
     }
     case "fortunecookie":
-      if (!counts[4] && counts[8]) multiplier = 2;
+      if (!counts[4] && counts[8]) multiplier = ratio(2);
       break;
     case "fiver":
       flat(divisibilityStatus(id, reels).triggers, 25);
@@ -399,8 +404,8 @@ export function scoreTrinket(item, reels, state = null) {
           hit < hits;
           hit++
         )
-          steps.push({ reels: [i], points: 0 });
-      multiplier = 3 ** steps.length;
+          steps.push({ reels: [i], points: 0n });
+      multiplier = powerRatio(3, steps.length);
       steps.forEach((step, index) => {
         step.note = `Favorite ${favorite}: ×3 (${index + 1}/${steps.length})`;
       });
@@ -412,7 +417,7 @@ export function scoreTrinket(item, reels, state = null) {
       add([], 24, false);
       break;
     case "blackjack":
-      if (sum === 21) multiplier = 3;
+      if (sum === 21) multiplier = ratio(3);
       break;
     case "fullhouse":
       if (
@@ -420,7 +425,7 @@ export function scoreTrinket(item, reels, state = null) {
           (n, i) => n >= 3 && counts.some((m, j) => j !== i && m >= 2),
         )
       )
-        multiplier = 2;
+        multiplier = ratio(2);
       break;
     case "dragon":
       add([], 50 * (state?.trinkets.length ?? 1), false);
@@ -475,13 +480,13 @@ export function scoreTrinket(item, reels, state = null) {
       throw new Error(`Missing trinket effect: ${id}`);
   }
   if (id !== "seven" && item.metadata.power != null)
-    note = `Power: ${item.metadata.power}`;
+    note = `Power: ${formatNumber(item.metadata.power)}`;
   if (cash) note += `${note ? ": " : ""}+$${cash}`;
-  if (multiplier > 1)
-    note += `${note ? ": " : ""}×${id === "silent" ? Number(multiplier.toPrecision(10)) : Math.round(multiplier)} round score`;
+  if (hasMultiplier(multiplier))
+    note += `${note ? ": " : ""}×${formatRatio(multiplier)} round score`;
   return {
     id,
-    points: steps.reduce((sum, s) => sum + s.points, 0),
+    points: steps.reduce((sum, s) => sum + s.points, 0n),
     note,
     steps,
     cash,

@@ -37,6 +37,14 @@ import { animateCount } from "./animation.js";
 import { divisibilityStatus } from "./scoring.js";
 import { trinketStacks } from "./effects.js";
 import { revealInventoryItem } from "./inventory-reveal.js";
+import {
+  formatNumber,
+  formatRatio,
+  hasMultiplier,
+  scoreReplacer,
+  scoreReviver,
+} from "./score.js";
+import { installLongPress } from "./scoring-controls.js";
 
 const sound = new GameAudio();
 const recordPlayer = document.querySelector("#record-player");
@@ -144,6 +152,7 @@ let ui = {
   phase: null,
   logs: [],
   fast: false,
+  skipScoring: false,
   displayPoints: 0,
   displayTotal: 0,
   displayBank: 0,
@@ -193,10 +202,7 @@ const poolSlotFace = (slot) =>
       : esc(slot);
 
 /** Formats a score or cash value for compact display. */
-const number = (value) =>
-  value >= 1e9
-    ? value.toExponential(3).replace("e+", "e")
-    : value.toLocaleString("en-US");
+const number = formatNumber;
 
 /** Waits for an animation delay, shortened when reduced motion is preferred. */
 const sleep = (ms) =>
@@ -245,13 +251,19 @@ function celebrateGoal(anchor) {
 /** Returns the temporary UI phase when present, otherwise the saved game phase. */
 const phase = () => ui.phase || state?.phase;
 
+function validScore(value) {
+  return typeof value === "bigint"
+    ? value >= 0n
+    : Number.isFinite(value) && value >= 0;
+}
+
 /**
  * Reads and validates a resumable run from browser storage.
  * @returns {object|null} The saved run, or null when none is valid.
  */
 function readSave() {
   try {
-    const data = JSON.parse(localStorage.getItem(SAVE_KEY));
+    const data = JSON.parse(localStorage.getItem(SAVE_KEY), scoreReviver);
     if (
       !data ||
       data.version !== 2 ||
@@ -267,9 +279,10 @@ function readSave() {
     )
       return null;
     if (
-      ![data.bank, data.total, data.points, data.toolRolls, data.rerolls].every(
+      ![data.bank, data.toolRolls, data.rerolls].every(
         (n) => Number.isFinite(n) && n >= 0,
-      )
+      ) ||
+      ![data.total, data.points].every(validScore)
     )
       return null;
     if (
@@ -297,7 +310,10 @@ function readSave() {
           ITEMS[t.id]?.kind === "trinket" &&
           t.metadata &&
           Object.values(t.metadata).every(
-            (value) => value === null || Number.isFinite(value),
+            (value) =>
+              value === null ||
+              typeof value === "bigint" ||
+              Number.isFinite(value),
           ),
       )
     )
@@ -334,7 +350,7 @@ function readSave() {
     if (
       !Array.isArray(data.history) ||
       !Array.isArray(data.events) ||
-      !data.events.every((e) => ITEMS[e.id] && Number.isFinite(e.points))
+      !data.events.every((e) => ITEMS[e.id] && validScore(e.points))
     )
       return null;
     if (
@@ -394,7 +410,7 @@ function readSave() {
 function persist() {
   saved = structuredClone(state);
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state, scoreReplacer));
   } catch {}
 }
 
@@ -521,7 +537,7 @@ function stats() {
   const bank = scoring ? ui.displayBank : state.bank;
   const total = scoring
     ? ui.displayTotal
-    : state.total + (state.phase === "editing" ? state.points : 0);
+    : state.total + (state.phase === "editing" ? state.points : 0n);
   const bonus =
     current === "scored"
       ? state.points >= goalFor(state.round)
@@ -752,7 +768,7 @@ function logRow(event, pending = false) {
   const isCashBonus = event.cashOnly || ["w", "octopus"].includes(event.id);
   const isMessageEvent = Boolean(event.message);
   return `
-    <div class="log-row ${event.points || event.totalPoints || event.cash || event.multiplier > 1 || isCashBonus || isMessageEvent ? "" : "missed"}">
+    <div class="log-row ${event.points || event.totalPoints || event.cash || hasMultiplier(event.multiplier) || isCashBonus || isMessageEvent ? "" : "missed"}">
       <img src="${iconPath(event.id)}" alt="" width="52" height="52">
       <div>
         <span class="log-name">
@@ -761,7 +777,7 @@ function logRow(event, pending = false) {
         ${
           isMessageEvent
             ? `<span class="log-message">${esc(event.message)}</span>`
-            : `+${isCashBonus ? "$" : ""}<span class="log-points">${number(pending ? (event.previewPoints ?? 0) : isCashBonus ? event.cash : event.points + (event.totalPoints ?? 0))}</span>`
+            : `+${isCashBonus ? "$" : ""}<span class="log-points">${number(pending ? (event.previewPoints ?? 0n) : isCashBonus ? event.cash : event.points + (event.totalPoints ?? 0n))}</span>`
         }
         ${event.note ? `<small class="log-note" ${pending ? "hidden" : ""}>${esc(event.note)}</small>` : ""}
       </div>
@@ -795,7 +811,7 @@ function renderGame({ animateOffers = false } = {}) {
           id="score-log"
           ${
             current === "scoring"
-              ? 'role="button" tabindex="0" aria-label="Speed up scoring" data-action="speed"'
+              ? 'role="button" tabindex="0" aria-label="Tap to speed up scoring, or hold to skip all scoring animations" data-action="speed"'
               : 'role="log"'
           }
         >
@@ -807,7 +823,7 @@ function renderGame({ animateOffers = false } = {}) {
         <p class="log-footer">
           ${
             current === "scoring"
-              ? "click the log to speed things up"
+              ? "click the log to speed things up! or hold to skip all scoring"
               : `${number(state.points)} points added to your total`
           }
         </p>
@@ -875,7 +891,7 @@ function renderGame({ animateOffers = false } = {}) {
             ? `
               <p class="run-summary">
                 ${state.history.filter((h) => h.bonus).length} goals reached |
-                best spin: ${number(Math.max(...state.history.map((h) => h.points)))}
+                best spin: ${number(state.history.reduce((best, h) => (h.points > best ? h.points : best), 0n))}
               </p>
             `
             : ""
@@ -1114,6 +1130,7 @@ async function doSpin() {
  * @returns {Promise<void>}
  */
 function waitForScore(ms) {
+  if (ui.skipScoring) return Promise.resolve();
   return new Promise((resolve) => {
     const timer = setTimeout(
       () => {
@@ -1144,6 +1161,7 @@ async function doScore() {
   ui.phase = "scoring";
   ui.logs = [];
   ui.fast = false;
+  ui.skipScoring = false;
   ui.selected = null;
   ui.source = null;
   render();
@@ -1156,8 +1174,10 @@ async function doScore() {
   const goal = goalFor(state.round);
   let goalReached = ui.displayPoints >= goal;
   /** Checks whether scoring animation should finish immediately. */
-  const instant = () => reducedMotion.matches || ui.fast || document.hidden;
+  const instant = () =>
+    reducedMotion.matches || ui.fast || ui.skipScoring || document.hidden;
   for (const event of state.events) {
+    if (ui.skipScoring) break;
     ui.logs.push(event);
     const log = document.querySelector("#score-log");
     log.querySelector(".log-empty")?.remove();
@@ -1186,7 +1206,7 @@ async function doScore() {
       row.classList.remove("scoring-active");
       continue;
     }
-    let subtotal = event.previewPoints ?? 0;
+    let subtotal = event.previewPoints ?? 0n;
     // Older saves can still display aggregate events without contribution data.
     const steps =
       event.previewPoints != null
@@ -1196,11 +1216,12 @@ async function doScore() {
               points: event.points - event.previewPoints,
             },
           ]
-            .filter((step) => step.points !== 0)
+            .filter((step) => step.points !== 0n)
             .concat((event.steps ?? []).filter((step) => step.totalOnly))
         : (event.steps ??
           (event.points ? [{ reels: [], points: event.points }] : []));
     for (const step of steps) {
+      if (ui.skipScoring) break;
       const note = row.querySelector(".log-note");
       if (step.note && note) {
         note.textContent = step.note;
@@ -1224,7 +1245,7 @@ async function doScore() {
         update(value) {
           ledger.textContent = number(value);
           ui.displayPoints =
-            pointsBefore + (step.totalOnly ? 0 : value - previous);
+            pointsBefore + (step.totalOnly ? 0n : value - previous);
           ui.displayTotal = totalBefore + value - previous;
           pointsNode.textContent = number(ui.displayPoints);
           totalNode.textContent = number(ui.displayTotal);
@@ -1233,8 +1254,10 @@ async function doScore() {
             pointsNode.closest(".points")?.classList.add("goal-reached");
             subtitle.textContent = `goal reached: +$${bonusFor(state.round)}!`;
             subtitle.classList.add("bonus-award");
-            celebrateGoal(subtitle);
-            sound.play("bonus");
+            if (!ui.skipScoring) {
+              celebrateGoal(subtitle);
+              sound.play("bonus");
+            }
           }
         },
       });
@@ -1253,6 +1276,7 @@ async function doScore() {
     row.classList.remove("scoring-active");
     await waitForScore(event.points ? 180 : 220);
   }
+  ui.logs = [...state.events];
   const bonus = state.history.at(-1).bonus;
   subtitle.textContent = bonus
     ? `made the goal: +$${bonus}!`
@@ -1374,8 +1398,8 @@ async function animateCameraEffect(before) {
       const activation = state.pendingEvents
         .slice(before.pendingEvents.length)
         .find((event) => event.id === item.id);
-      if (activation?.multiplier > 1)
-        changes.push(`×${activation.multiplier} round score`);
+      if (activation && hasMultiplier(activation.multiplier))
+        changes.push(`×${formatRatio(activation.multiplier)} round score`);
       if (!previous) changes.push("Gained!");
       else if (kind === "trinkets") {
         for (const key of ["power", "count", "favorite"]) {
@@ -1933,6 +1957,12 @@ document.addEventListener("keydown", (event) => {
     ui.fast = true;
     scoreWait?.();
   }
+});
+installLongPress(document, () => {
+  if (ui.phase !== "scoring") return;
+  ui.skipScoring = true;
+  document.querySelector(".goal-confetti")?.remove();
+  scoreWait?.();
 });
 window.addEventListener("resize", hideTooltip);
 document.addEventListener(

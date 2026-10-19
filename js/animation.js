@@ -1,6 +1,14 @@
+import { asScore } from "./score.js";
+
 /** Integer interpolation that approaches its exact destination with decreasing speed. */
 export function countValue(from, to, progress) {
   const t = Math.max(0, Math.min(1, progress));
+  if (typeof from === "bigint" || typeof to === "bigint") {
+    from = asScore(from); to = asScore(to);
+    if (t === 1) return to;
+    const fraction = BigInt(Math.floor((1 - (1 - t) ** 3) * 1000000));
+    return from + (to - from) * fraction / 1000000n;
+  }
   return t === 1 ? to : from + Math.trunc((to - from) * (1 - (1 - t) ** 3));
 }
 

@@ -1,3 +1,5 @@
+import { asScore, formatNumber } from "./score.js";
+
 export const RARITIES = {
   fallback: { label: "Fallback", weight: 0, price: 0 },
   token: { label: "Token", weight: 0, price: 0 },
@@ -486,11 +488,12 @@ export const TRINKETS = [
     id: "screwdriver",
     name: "Screwdriver",
     emoji: "🪛",
-    rarity: "uncommon",
+    rarity: "rare",
     effect: "screwdriver",
     description: "Tool upgrades are 50% cheaper.",
     kind: "trinket",
     metadata: {},
+    price: 43,
   },
   {
     id: "constructionworker",
@@ -1506,7 +1509,15 @@ export function itemPrice(item) {
 export function ownItem(id) {
   const def = ITEMS[id];
   return def.kind === "trinket"
-    ? { id, metadata: { ...def.metadata } }
+    ? {
+        id,
+        metadata: {
+          ...def.metadata,
+          ...(def.metadata?.power != null
+            ? { power: asScore(def.metadata.power) }
+            : {}),
+        },
+      }
     : { id, maxUses: def.maxUses, uses: def.maxUses };
 }
 
@@ -1533,7 +1544,7 @@ export function itemDescription(owned) {
       ? ` Progress: ${owned.metadata.count}.`
       : "") +
     (owned.metadata?.power != null
-      ? ` Current power: ${owned.metadata.power}.`
+      ? ` Current power: ${formatNumber(owned.metadata.power)}.`
       : "") +
     (def.kind === "tool"
       ? def.limitedUse
