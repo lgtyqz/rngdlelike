@@ -1,5 +1,31 @@
 import { ITEMS } from "./items.js";
 
+/** Passive modifiers cannot be activated directly with Camera. */
+export const PASSIVE_TRINKETS = new Set([
+  "clover", "bicycle", "printer", "hammer", "backpack", "mechanical-arm",
+  "mining", "magnifier", "eightball", "cross", "graduate", "wrench",
+  "screwdriver", "cartwheel", "wheel", "scientist", "confettihorn",
+  "partyface", "fallingleaves", "ferriswheel",
+]);
+const SHOP_ONLY_TRINKETS = new Set([
+  "bank", "test-tube", "alembic", "upgradeexp", "toolexp",
+]);
+
+/** Copiers qualify for Silent only if they have a non-passive ability to trigger. */
+export function silentEligibleUids(state) {
+  const effects = trinketEffects(state);
+  const eligibleAbility = (id) =>
+    !PASSIVE_TRINKETS.has(id) && !SHOP_ONLY_TRINKETS.has(id);
+  return new Set(
+    state.trinkets.filter((item) => {
+      const abilities = effects.filter((effect) => effect.owner === item);
+      return abilities.length
+        ? abilities.some(({ id }) => eligibleAbility(id))
+        : eligibleAbility(item.id);
+    }).map((item) => item.uid),
+  );
+}
+
 /** Returns one representative per stack in the order shown in the inventory. */
 export function trinketStacks(state) {
   const seen = new Set();
@@ -38,4 +64,24 @@ export function markActivated(state, item) {
   if (owner.uid == null) return;
   const active = (state.activatedTrinkets ??= []);
   if (!active.includes(owner.uid)) active.push(owner.uid);
+}
+
+/** Groups inactive scoring participants without counting rewards gained during scoring. */
+export function inactiveTrinketStacks(state) {
+  const participants = state.silentContext?.participants ?? state.trinkets;
+  const silentUids = new Set(
+    state.silentContext?.silentUids ?? trinketEffects(state)
+      .filter((t) => t.id === "silent").map((t) => t.owner.uid),
+  );
+  const active = new Set(state.activatedTrinkets ?? []);
+  const eligible = state.silentContext?.eligibleUids ?? silentEligibleUids(state);
+  const stacks = new Map();
+  for (const item of participants) {
+    if (!eligible.has(item.uid) || silentUids.has(item.uid) || active.has(item.uid))
+      continue;
+    const stack = stacks.get(item.id) ?? { id: item.id, count: 0 };
+    stack.count++;
+    stacks.set(item.id, stack);
+  }
+  return [...stacks.values()];
 }

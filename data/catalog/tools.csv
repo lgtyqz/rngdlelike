@@ -1,33 +1,33 @@
 ID,Tool Name,Emoji,Text,Initial Uses,Rarity,Limited Use
-reroll,Reroll One,counterclockwise arrows,Select a reel to roll a new random number.,3,Common,
-increment,Increment,plus,Add 1 to a reel (9 becomes 0),1,Common,
-decrement,Decrement,minus,Subtract 1 from a reel (0 becomes 9),1,Common,
+reroll,Reroll One,counterclockwise arrows,Select a reel to roll again.,3,Common,
+increment,Increment,plus,Add 1 to a displayed digit (9 becomes 0).,1,Common,
+decrement,Decrement,minus,"Subtract 1 from a displayed digit (0 becomes 9), or count down a Bomb.",1,Common,
 flip,Flip,clockwise vertical arrows,Replace a digit with 9 minus that digit.,1,Common,
-swap,Swap,shuffle,Pick two different digits to switch.,2,Uncommon,
+swap,Swap,shuffle,"Swap the displayed values of two different reels, including grey values.",2,Uncommon,
 double,Double,bangbang,"Double a digit, keeping only the last digit.",2,Uncommon,
-copy,Copycat,cat,"Select a reel to copy, then a different reel to copy onto.",1,Rare,
-bigreroll,Reroll Three,cyclone,"Select a reel to reroll, then reroll the reels next to it.",2,Uncommon,
+copy,Copycat,cat,Copy one reel's displayed value onto a different reel for this spin.,1,Rare,
+bigreroll,Reroll Three,cyclone,Reroll a reel and both neighbors. The first and last reels are neighbors.,2,Uncommon,
 megareroll,Reroll All,spiral eyes,Respin all reels.,2,Rare,
 seven-tool,Time for Seven,seven o clock,Set any reel to 7.,1,Rare,
 eight-tool,Time for Eight,eight o clock,Set any reel to 8.,1,Rare,
-echo,Speak Facts,speaking head,Copy a reel's digit to both its neighbors.,1,Legendary,
-bomb,Bomb,bomb,"Permanently replace a reel slot with a Bomb (starting at 3). Landing on a bomb counts it down, and bombs exploding removes the reel slot altogether and gives you +$100!",3,Rare,TRUE
-w,W,w,Permanently replace a reel slot with a W. Landing on a W gives you double the cash bonus for the round.,2,Rare,TRUE
-camera,Camera,camera with flash,Activate a trinket's ablity.,1,Legendary,
-soap,Soap,soap,"Remove a slot from a reel, permanently.",1,Uncommon,TRUE
+echo,Speak Facts,speaking head,Copy a reel's displayed value onto both neighbors for this spin. The first and last reels are neighbors.,1,Legendary,
+bomb,Bomb,bomb,"Permanently replace the displayed reel slot with a Bomb starting at 3. Each later landing or Decrement counts it down. At 0, remove that slot and gain $100.",3,Rare,TRUE
+w,W,w,Permanently replace the displayed reel slot with W. Each W on the final board adds $50 to your cash reward if you meet the goal.,2,Rare,TRUE
+camera,Camera,camera with flash,Trigger a non-passive trinket's abilities using the current reels. The Silent resolves when the spin is scored. No Tools! gives no points when targeted directly.,1,Legendary,
+soap,Soap,soap,"Permanently remove the displayed slot from a reel, leaving it blank until changed or rerolled.",1,Uncommon,TRUE
 pill,Pill,pill,Permanently increase a number on a reel.,1,Common,TRUE
-mirror,Mirror,mirror,Permanently clone a number on a reel.,1,Rare,TRUE
-atm,ATM,atm,Spend $30 to give another tool one more use this spin.,1,Legendary,
-lock,Lock,lock,"Lock the displayed value for the next spin, even if it isn't in the reel's pool.",1,Uncommon,
-qubit,Superposition,trident,"Permanently replace a slot on a reel with a Superposition, which lets you choose between whether it's a zero or a one.",2,Rare,TRUE
-butterfly,Butterfly,butterfly,Permanently change a trinket into another of the same rarity.,1,Legendary,
-sparkles,Sparkles,sparkles,Permanently change a trinket into another with one higher rarity.,1,Rare,TRUE
-incrementall,Increment All,fast up button,Add 1 to ALL reels (9 becomes 0).,1,Uncommon,
-decrementall,Decrement All,fast down button,Subtract 1 from ALL reels (0 becomes 9).,1,Uncommon,
-pawn,Pawn,pawn,Sell a trinket for $10.,1,Rare,,
-jar,Jar,jar,Pick a number to save for later.,1,Rare,,
-dna,DNA,dna,Permanently duplicate a Common or Uncommon trinket.,1,Legendary,,
-magicwand,Magic Wand,magic wand,Permanently transform a trinket into a Frog that adds 2% interest to your TOTAL score after each spin. (Frogs are also immune to science!),1,Rare,,
-razor,Shaving Razor,razor,Spend $30 to permanently remove a slot from a reel (Blades are expensive!),1,Legendary,,(Reduced initial cost)
-trollingstone,Rolling Stone,stone,Permanently remove a slot from a reel that is 2 or less.,1,Rare,,
-cutdown,Cut Down to Size,saw,Permanently remove a slot from a reel that is 7 or more.,1,Rare,,
+mirror,Mirror,mirror,"Permanently add one exact copy of a trinket, including its current power and progress. Does not trigger acquisition abilities.",1,Rare,TRUE
+atm,ATM,atm,Spend $15 to give another tool one more use this spin. Legendary tools cost $150 to refresh.,1,Legendary,
+lock,Lock,lock,"Keep this reel's displayed value throughout the next spin, including rerolls, even if it is absent from the reel's pool.",1,Uncommon,
+qubit,Superposition,trident,"Permanently replace the displayed reel slot with Superposition. When it appears, choose 0 or 1; it is grey until chosen. Choosing does not trigger seen abilities.",2,Rare,TRUE
+butterfly,Butterfly,butterfly,Transform one non-Token trinket copy into an unowned trinket of the same rarity. Falling Leaves cannot transform. Becomes Bug if none is available.,1,Legendary,
+sparkles,Sparkles,sparkles,"Transform one trinket copy into an unowned trinket one rarity higher; Legendary stays Legendary. Cannot target Tokens, Bug, or Falling Leaves. If none is available, gain Bug and keep the original.",1,Rare,TRUE
+incrementall,Increment All,fast up button,Add 1 to every displayed digit (9 becomes 0). Skips Bombs and grey values.,1,Uncommon,
+decrementall,Decrement All,fast down button,Subtract 1 from every displayed digit (0 becomes 9) and count down all displayed Bombs. Skips grey values.,1,Uncommon,
+pawn,Pawn,pawn,Sell one trinket copy for $35.,1,Rare,,
+jar,Jar,jar,"Store a displayed digit without removing it. On a later use, place it on any reel for that spin and empty the Jar. Stored digits carry between spins.",1,Rare,,
+dna,DNA,dna,Permanently add one copy of a Common or Uncommon trinket. Does not trigger acquisition abilities.,1,Legendary,,
+magicwand,Magic Wand,magic wand,Transform one trinket copy into a Frog that pays $10 after each spin. Cannot transform Falling Leaves. Replication Experiment cannot copy Frogs.,1,Rare,,
+razor,Shaving Razor,razor,"Spend $30 to permanently remove the displayed reel slot, leaving it blank until changed or rerolled.",1,Legendary,,(Reduced initial cost)
+trollingstone,Rolling Stone,stone,"Permanently remove the displayed reel slot if its digit is 2 or less, leaving the reel blank until changed or rerolled.",1,Rare,,
+cutdown,Cut Down to Size,saw,"Permanently remove the displayed reel slot if its digit is 7 or more, leaving the reel blank until changed or rerolled.",1,Rare,,

@@ -150,6 +150,7 @@ export const SOUND_REGISTRY = {
   atm: { src: "../assets/sounds/atm.wav", volume: 0.8 },
   package: { src: "../assets/sounds/box.wav", volume: 0.8 },
   mirror: { src: "../assets/sounds/mirror.wav", volume: 0.8 },
+  pawn: { src: "../assets/sounds/pawn.wav", volume: 0.8 },
 };
 
 /** Owns a lazily unlocked audio context and the persistent sound preference. */

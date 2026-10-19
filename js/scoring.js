@@ -1,6 +1,10 @@
 import { ITEMS } from "./items.js";
 import { hash, random } from "./random.js";
-import { trinketEffects, markActivated } from "./effects.js";
+import {
+  trinketEffects,
+  markActivated,
+  inactiveTrinketStacks,
+} from "./effects.js";
 
 /** Each copy independently reduces the chance of no double trigger by 68%. */
 export const eightBallHits = (state, rng) => {
@@ -100,6 +104,14 @@ export function scoreTrinket(item, reels, state = null) {
         step.note = `Grey slot: ×4 (${index + 1}/${steps.length})`;
       });
       break;
+    case "waningcrescent":
+      for (const i of all.filter((index) => !isDigit(reels[index])))
+        steps.push({ reels: [i], points: 0 });
+      flat(true, 200 * steps.length);
+      steps.forEach((step, index) => {
+        step.note = `Grey slot: +200 (${index + 1}/${steps.length})`;
+      });
+      break;
     case "bug":
       flat(true, 2560);
       break;
@@ -186,7 +198,7 @@ export function scoreTrinket(item, reels, state = null) {
       break;
     case "brainrot3":
       if (reels.length && reels.every((n) => n === 6 || n === 7))
-        multiplier = 67;
+        multiplier = 6.7;
       break;
     case "dormant3":
       multiplier =
@@ -196,10 +208,13 @@ export function scoreTrinket(item, reels, state = null) {
       flat(true, 200);
       break;
     case "abacus":
-      if (state?.toolsUsed === 5) cash = 45;
+      if (state?.toolsUsed === 5) {
+        cash = 20;
+        flat(true, 100);
+      }
       break;
     case "mechanic":
-      cash = Math.max(0, 100 - 7 * (state?.toolsUsed ?? 0));
+      cash = Math.max(0, 60 - 6 * (state?.toolsUsed ?? 0));
       break;
     case "liberty":
       reels.forEach((n) => {
@@ -208,17 +223,14 @@ export function scoreTrinket(item, reels, state = null) {
       });
       break;
     case "silent": {
-      const silentOwners = new Set(
-        trinketEffects(state)
-          .filter((t) => t.id === "silent")
-          .map((t) => t.owner),
-      );
-      multiplier =
-        1.2 **
-        (state?.trinkets.filter(
-          (t) =>
-            !silentOwners.has(t) && !state.activatedTrinkets?.includes(t.uid),
-        ).length ?? 0);
+      const stacks = state ? inactiveTrinketStacks(state) : [];
+      multiplier = 1.1 ** stacks.reduce((sum, stack) => sum + stack.count, 0);
+      note = stacks
+        .map(
+          (stack) =>
+            `${ITEMS[stack.id].name}${stack.count > 1 ? ` ×${stack.count}` : ""}: didn't trigger`,
+        )
+        .join("\n");
       break;
     }
     case "seven":
@@ -227,7 +239,7 @@ export function scoreTrinket(item, reels, state = null) {
       break;
     case "hotface":
     case "coldface": {
-      const amount = 4;
+      const amount = 3;
       each(
         (n) =>
           id === "hotface"
@@ -289,7 +301,7 @@ export function scoreTrinket(item, reels, state = null) {
     case "nerd":
       reels.forEach((n, i) => {
         if (n === 0 || n === 1) {
-          add([i], 42);
+          add([i], 100);
           cash += 24;
         }
       });
@@ -451,11 +463,13 @@ export function scoreTrinket(item, reels, state = null) {
     case "rat":
     case "upgradeexp":
     case "toolexp":
-    case "frog":
     case "fallingleaves":
     case "phoenix":
     case "monkey":
     case "ferriswheel":
+      break;
+    case "frog":
+      cash += 10;
       break;
     default:
       throw new Error(`Missing trinket effect: ${id}`);
@@ -464,7 +478,7 @@ export function scoreTrinket(item, reels, state = null) {
     note = `Power: ${item.metadata.power}`;
   if (cash) note += `${note ? ": " : ""}+$${cash}`;
   if (multiplier > 1)
-    note += `${note ? ": " : ""}×${Math.round(multiplier)} round score`;
+    note += `${note ? ": " : ""}×${id === "silent" ? Number(multiplier.toPrecision(10)) : Math.round(multiplier)} round score`;
   return {
     id,
     points: steps.reduce((sum, s) => sum + s.points, 0),

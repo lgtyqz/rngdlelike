@@ -791,6 +791,9 @@ img#game-promo-logo {
 .log-row .log-note[hidden] {
   display: none;
 }
+.log-row .log-note {
+  white-space: pre-line;
+}
 .reel.landed {
   animation: land 0.28s ease-out;
 }

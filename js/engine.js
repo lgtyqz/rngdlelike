@@ -7,6 +7,7 @@ import {
   itemPrice,
 } from "./items.js";
 import { hash, random, nextRandom, dailyDateForSeed } from "./random.js";
+import { chooseShopItem, chooseShopOffer } from "./shop.js";
 import {
   scoreTrinket,
   isDigit,
@@ -14,7 +15,14 @@ import {
   reelValue,
   eightBallHits,
 } from "./scoring.js";
-import { trinketEffects, markActivated } from "./effects.js";
+import {
+  trinketEffects,
+  trinketStacks,
+  markActivated,
+  inactiveTrinketStacks,
+  PASSIVE_TRINKETS,
+  silentEligibleUids,
+} from "./effects.js";
 export { scoreTrinket } from "./scoring.js";
 export const TOTAL_SPINS = 20;
 export const TOOL_CHANCE = 0.6;
@@ -56,9 +64,13 @@ const availableTrinkets = TRINKETS.filter(
 );
 const trinketRarities = ["common", "uncommon", "rare", "legendary"];
 const EXPERIMENTS = ["test-tube", "alembic", "upgradeexp", "toolexp"];
+/** Dormant II blocks new Dormant I rolls; copying an owned trinket bypasses this. */
+const canGenerateTrinket = (state, id) =>
+  id !== "dormant1" || !has(state, "dormant2");
 const canOffer = (state, id) =>
-  !has(state, id) ||
-  (EXPERIMENTS.includes(id) && count(state, "scientist") > 0);
+  canGenerateTrinket(state, id) &&
+  (!has(state, id) ||
+    (EXPERIMENTS.includes(id) && count(state, "scientist") > 0));
 const canTransform = (state, item) =>
   !trinketEffects(state).some(
     (effect) => effect.owner === item && effect.id === "fallingleaves",
@@ -164,28 +176,6 @@ export function createRun(seed, mode = "normal", date = null) {
 }
 
 const REROLLS = ["reroll", "bigreroll", "megareroll"];
-const PASSIVES = new Set([
-  "clover",
-  "bicycle",
-  "printer",
-  "hammer",
-  "backpack",
-  "mechanical-arm",
-  "mining",
-  "magnifier",
-  "eightball",
-  "cross",
-  "graduate",
-  "wrench",
-  "screwdriver",
-  "cartwheel",
-  "wheel",
-  "scientist",
-  "confettihorn",
-  "partyface",
-  "fallingleaves",
-  "ferriswheel",
-]);
 /** Creates the next deterministic effect roll without consuming shop or spin randomness. */
 const effectRng = (state, label) =>
   random(hash(`${state.seed}:${label}:${state.round}:${state.effectRolls++}`));
@@ -676,7 +666,7 @@ export function useTool(state, id, target, source = null) {
       if (!item) return false;
       if (id === "pawn") {
         state.trinkets.splice(state.trinkets.indexOf(item), 1);
-        state.bank += 10;
+        state.bank += 35;
       } else if (id === "dna") {
         if (!["common", "uncommon"].includes(ITEMS[item.id].rarity))
           return false;
@@ -822,7 +812,10 @@ export function useTool(state, id, target, source = null) {
       )
         return false;
       const candidates = availableTrinkets.filter(
-        (t) => t.rarity === ITEMS[item.id].rarity && !has(state, t.id),
+        (t) =>
+          t.rarity === ITEMS[item.id].rarity &&
+          !has(state, t.id) &&
+          canGenerateTrinket(state, t.id),
       );
       const replacement =
         choose(candidates, effectRng(state, "butterfly")) ?? ITEMS.bug;
@@ -843,7 +836,10 @@ export function useTool(state, id, target, source = null) {
           ? trinketRarities[rarityIndex]
           : trinketRarities[rarityIndex + 1];
       const candidates = availableTrinkets.filter(
-        (t) => t.rarity === nextRarity && !has(state, t.id),
+        (t) =>
+          t.rarity === nextRarity &&
+          !has(state, t.id) &&
+          canGenerateTrinket(state, t.id),
       );
       if (!candidates.length) {
         acquire(state, "bug");
@@ -857,7 +853,7 @@ export function useTool(state, id, target, source = null) {
       const item = Number.isInteger(target)
         ? state.trinkets[target]
         : state.trinkets.find((t) => t.id === target);
-      if (!item || PASSIVES.has(item.id)) return false;
+      if (!item || PASSIVE_TRINKETS.has(item.id)) return false;
       const event = activate(state, item);
       cameraEvent = event;
       if (item.id === "no-tools") {
@@ -911,7 +907,10 @@ export function useTool(state, id, target, source = null) {
 /** Awards an unowned trinket in the allowed rarities, falling back to Bug. */
 function randomTrinket(state, rarities = null) {
   const pool = availableTrinkets.filter(
-    (t) => !has(state, t.id) && (!rarities || rarities.includes(t.rarity)),
+    (t) =>
+      !has(state, t.id) &&
+      canGenerateTrinket(state, t.id) &&
+      (!rarities || rarities.includes(t.rarity)),
   );
   const rng = effectRng(state, "reward");
   const weight = pool.reduce((sum, t) => sum + (t.id === "dud" ? 0.1 : 1), 0);
@@ -922,20 +921,36 @@ function randomTrinket(state, rarities = null) {
   return def;
 }
 
-/** Transforms the whole inventory using fixed catalog priorities. */
-function openPackage(state) {
+/** Transforms the opening stacks and their visible neighbors, without wrapping. */
+function openPackage(state, owners) {
+  const stacks = trinketStacks(state);
+  const ids = new Set(
+    owners.flatMap((owner) => {
+      const index = stacks.findIndex((stack) => stack.id === owner.id);
+      return index < 0
+        ? []
+        : stacks
+            .slice(Math.max(0, index - 3), index + 4)
+            .map((stack) => stack.id);
+    }),
+  );
+  const targets = state.trinkets.filter((item) => ids.has(item.id));
+  // The event keeps this exclusion even if it transforms Dormant II first.
+  const blockedDormant = has(state, "dormant2");
   state.packageActivations = (state.packageActivations ?? 0) + 1;
   const rng = random(
     hash(`${state.seed}:package-transform:${state.packageActivations}`),
   );
-  for (const item of [...state.trinkets]) {
-    if (!canTransform(state, item)) continue;
-    const minimum = Math.min(
-      3,
-      trinketRarities.indexOf(ITEMS[item.id].rarity) + 1,
-    );
+  for (const item of targets) {
+    const trinketRarity = trinketRarities.indexOf(ITEMS[item.id].rarity);
+    if (!canTransform(state, item) || trinketRarity === -1) continue;
+    const minimum = Math.min(3, trinketRarity + 1);
     const pool = availableTrinkets.filter(
-      (t) => t.rarity === trinketRarities[minimum] && !has(state, t.id),
+      (t) =>
+        t.rarity === trinketRarities[minimum] &&
+        !has(state, t.id) &&
+        canGenerateTrinket(state, t.id) &&
+        (!blockedDormant || t.id !== "dormant1"),
     );
     const replacement =
       chooseShopItem(availableTrinkets, pool, rng, () => 1) ?? ITEMS.bug;
@@ -968,7 +983,10 @@ function experiment(state, item) {
     return def;
   }
   const pool = state.trinkets.filter(
-    (t) => t !== (item.owner ?? item) && t.id !== "frog",
+    (t) =>
+      t !== (item.owner ?? item) &&
+      t.id !== "frog" &&
+      !EXPERIMENTS.includes(t.id),
   );
   const rng = effectRng(state, "replication");
   const original = pool[Math.floor(rng() * pool.length)];
@@ -1024,23 +1042,42 @@ function activate(state, item, context = {}) {
   const events = abilities.map((ability) =>
     activateAbility(state, ability, { ...context, path: next }),
   );
-  if (events.length === 1 && abilities[0].id === ownerId) return events[0];
+  if (events.length === 1 && abilities[0].id === ownerId)
+    return { ...events[0], ownerUid: item.uid };
   const event = emptyEvent(ownerId);
-  for (const part of events) {
+  event.ownerUid = item.uid;
+  const copiedLines = [];
+  for (const [index, part] of events.entries()) {
+    const details = [
+      part.points ? `+${part.points} points` : "",
+      part.note.replace(/\n/g, " · "),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    copiedLines.push(
+      `${ITEMS[abilities[index].id].name}${details ? ": " + details : ""}`,
+    );
     event.points += part.points;
     event.cash += part.cash;
     event.multiplier *= part.multiplier;
-    event.steps.push(...part.steps);
+    // Reveal each copied trinket on its own line as its contributions animate.
+    event.steps.push(
+      ...(part.steps.length ? part.steps : [{ reels: [], points: 0 }]).map(
+        (step) => ({ ...step, note: copiedLines.join("\n") }),
+      ),
+    );
     event.flagCount += part.flagCount ?? 0;
-    event.frogCount += part.frogCount ?? 0;
     event.snailCount += part.snailCount ?? 0;
     event.rewardFactor *= part.rewardFactor ?? 1;
+    event.silentCount += part.silentCount ?? 0;
+    event.silentOwnerUids.push(...(part.silentOwnerUids ?? []));
+    event.snailOwnerUids.push(...(part.snailOwnerUids ?? []));
+    if (part.repeatedTrinkets)
+      (event.repeatedTrinkets ??= []).push(...part.repeatedTrinkets);
   }
-  event.note = events
-    .map(
-      (e, i) => `${ITEMS[abilities[i].id].name}${e.note ? ": " + e.note : ""}`,
-    )
-    .join("\n");
+  event.deferredSilent =
+    events.length > 0 && events.every((part) => part.deferredSilent);
+  event.note = copiedLines.join("\n");
   return event;
 }
 
@@ -1052,15 +1089,58 @@ const emptyEvent = (id) => ({
   steps: [],
   note: "",
   flagCount: 0,
-  frogCount: 0,
   snailCount: 0,
   rewardFactor: 1,
+  silentCount: 0,
+  silentOwnerUids: [],
+  snailOwnerUids: [],
 });
+
+/** Ranks a normal spin on an isolated copy so previews cannot pay or grow trinkets. */
+function phoenixRanking(state) {
+  const preview = structuredClone(state);
+  settleSpin(preview, { skipPhoenix: true });
+  const points = new Map();
+  for (const event of preview.events) {
+    const uids = event.silentCount ? event.silentOwnerUids : [event.ownerUid];
+    for (const uid of uids) {
+      if (uid == null) continue;
+      points.set(uid, (points.get(uid) ?? 0) + event.points / uids.length);
+    }
+  }
+  const phoenixOwners = new Set(
+    trinketEffects(state)
+      .filter((effect) => effect.id === "phoenix")
+      .map((effect) => effect.owner.uid),
+  );
+  return state.trinkets
+    .map((item, index) => ({
+      uid: item.uid,
+      points: points.get(item.uid) ?? 0,
+      index,
+    }))
+    .filter((item) => !phoenixOwners.has(item.uid))
+    .sort((a, b) => b.points - a.points || a.index - b.index)
+    .map((item) => item.uid);
+}
 
 /** Resolves scoring, transformation, and reward hooks for one ability. */
 function activateAbility(state, item, context) {
   const owner = item.owner ?? item;
   const ownerId = owner.id;
+  if (item.id === "phoenix" && context.skipPhoenix) {
+    markActivated(state, item);
+    return emptyEvent(ownerId);
+  }
+  if (item.id === "silent") {
+    return {
+      ...emptyEvent(ownerId),
+      silentCount: 1,
+      silentOwnerUids: [owner.uid],
+      deferredSilent: true,
+      note: "Resolves after the other trinkets.",
+    };
+  }
   if (
     (!context.scoring || context.repeat) &&
     [
@@ -1076,8 +1156,8 @@ function activateAbility(state, item, context) {
     recordSeen(state, [0, 1, 2, 3, 4, 5], [item]);
   const event = scoreTrinket(item, state.reels, state);
   event.flagCount = item.id === "checkered-flag" ? 1 : 0;
-  event.frogCount = item.id === "frog" ? 1 : 0;
   event.snailCount = item.id === "snail" ? 1 : 0;
+  event.snailOwnerUids = item.id === "snail" ? [owner.uid] : [];
   state.bank += event.cash;
   const roll = () => effectRng(state, item.id)();
   const notes = [];
@@ -1111,8 +1191,8 @@ function activateAbility(state, item, context) {
     notes.push(`+$${amount} interest`);
   }
   if (item.id === "package" && !context.scoring && packageMatches(state)) {
-    openPackage(state);
-    notes.push("Password matched: transformed all trinkets");
+    openPackage(state, [owner]);
+    notes.push("Password matched!");
   }
   if (item.id === "rat") {
     item.metadata.count += state.reels
@@ -1120,7 +1200,7 @@ function activateAbility(state, item, context) {
       .filter((n) => n === 3).length;
     while (item.metadata.count >= 3) {
       item.metadata.count -= 3;
-      notes.push(`Gained ${randomTrinket(state, ["common"]).name}`);
+      notes.push(`Gained ${randomTrinket(state, ["uncommon", "rare"]).name}`);
     }
     event.note = `Progress: ${item.metadata.count}/3`;
   }
@@ -1145,9 +1225,13 @@ function activateAbility(state, item, context) {
     }
   }
   if (item.id === "phoenix") {
-    const inventory = [
-      ...state.trinkets.filter((trinket) => trinket.id !== "phoenix"),
-    ];
+    const ranking = context.phoenixRanking ?? phoenixRanking(state);
+    const inventory = ranking
+      .filter((uid) => !context.path.has(uid))
+      .map((uid) => state.trinkets.find((trinket) => trinket.uid === uid))
+      .filter(Boolean)
+      .slice(0, 3);
+    event.repeatedTrinkets = inventory.map(({ id, uid }) => ({ id, uid }));
     for (const other of inventory) {
       if (context.path.has(other.uid)) continue;
       const repeated = activate(state, other, {
@@ -1160,13 +1244,19 @@ function activateAbility(state, item, context) {
       event.steps.push(...repeated.steps);
       event.multiplier *= repeated.multiplier;
       event.flagCount += repeated.flagCount ?? 0;
-      event.frogCount += repeated.frogCount ?? 0;
       event.snailCount += repeated.snailCount ?? 0;
       event.rewardFactor =
         (event.rewardFactor ?? 1) * (repeated.rewardFactor ?? 1);
+      event.silentCount =
+        (event.silentCount ?? 0) + (repeated.silentCount ?? 0);
+      (event.silentOwnerUids ??= []).push(...(repeated.silentOwnerUids ?? []));
+      event.snailOwnerUids.push(...(repeated.snailOwnerUids ?? []));
     }
     transformTrinket(state, owner, "chick");
-    notes.push("Repeated all trinkets and reincarnated as Rare Chick");
+    const names = event.repeatedTrinkets.map(({ id }) => ITEMS[id].name);
+    notes.push(
+      `Repeated ${names.join(", ") || "no trinkets"} and reincarnated as Rare Chick`,
+    );
   }
   if (context.repeat && ["confettihorn", "partyface"].includes(item.id))
     event.rewardFactor = item.id === "confettihorn" ? 1.3 : 1.7;
@@ -1186,34 +1276,54 @@ function activateAbility(state, item, context) {
 }
 
 /** Resolves trinket effects, score multipliers, goal rewards, and round history. */
-export function settleSpin(state) {
+export function settleSpin(state, { skipPhoenix = false } = {}) {
   if (state.phase !== "editing") return false;
   syncTrinkets(state);
   const snapshot = [...state.trinkets];
   const effects = trinketEffects(state);
-  const regular = [],
-    silent = [];
+  const ranking =
+    !skipPhoenix && effects.some((effect) => effect.id === "phoenix")
+      ? phoenixRanking(state)
+      : null;
+  state.silentContext = {
+    participants: snapshot.map(({ id, uid }) => ({ id, uid })),
+    eligibleUids: silentEligibleUids(state),
+    silentUids: effects
+      .filter((t) => t.id === "silent")
+      .map((t) => t.owner.uid),
+  };
+  const regular = [];
   for (const item of snapshot) {
     if (!state.trinkets.includes(item)) continue;
-    const abilities = effects.filter((t) => t.owner === item);
-    const ordinary = abilities.filter(
-      (t) => t.id !== "silent" && t.id !== "octopus",
+    const abilities = effects.filter(
+      (t) => t.owner === item && t.id !== "octopus",
     );
-    const quiet = abilities.filter((t) => t.id === "silent");
-    if (ordinary.length)
-      regular.push(
-        activate(state, item, { scoring: true, abilities: ordinary }),
-      );
-    if (quiet.length) silent.push({ item, abilities: quiet });
-    if (!abilities.length) regular.push(emptyEvent(item.id));
+    regular.push(
+      abilities.length
+        ? activate(state, item, {
+            scoring: true,
+            abilities,
+            skipPhoenix,
+            phoenixRanking: ranking,
+          })
+        : emptyEvent(item.id),
+    );
   }
-  state.events = [
-    ...state.pendingEvents,
-    ...regular,
-    ...silent.map(({ item, abilities }) =>
-      activate(state, item, { scoring: true, abilities }),
-    ),
-  ];
+  const pendingCount = state.pendingEvents.length;
+  const deferred = new Map();
+  state.events = [...state.pendingEvents, ...regular].filter((event) => {
+    if (event.silentCount) {
+      const request = deferred.get(event.id) ?? {
+        ...emptyEvent(event.id),
+        abilityId: "silent",
+      };
+      request.silentCount += event.silentCount;
+      request.silentOwnerUids.push(...event.silentOwnerUids);
+      state.silentContext.silentUids.push(...event.silentOwnerUids);
+      deferred.set(event.id, request);
+    }
+    return !event.deferredSilent;
+  });
   let points = state.events.reduce((sum, event) => sum + event.points, 0);
   for (const event of state.events) {
     if (event.multiplier > 1) {
@@ -1250,35 +1360,92 @@ export function settleSpin(state) {
     ...state.events.filter((e) => !e.flagCount && e.id !== "checkered-flag"),
     ...state.events.filter((e) => e.flagCount || e.id === "checkered-flag"),
   ];
-  state.points = Math.round(points);
-  if (points < goalFor(state.round)) {
+  // Goal-dependent trinkets decide whether to trigger before Silent changes the score.
+  const triggerPoints = points;
+  const triggeredGoal = triggerPoints >= goalFor(state.round);
+  const rewardFactor = triggeredGoal
+    ? 1.3 ** effects.filter((t) => t.id === "confettihorn").length *
+      1.7 ** effects.filter((t) => t.id === "partyface").length *
+      state.events.reduce(
+        (factor, event) => factor * (event.rewardFactor ?? 1),
+        1,
+      )
+    : 1;
+  for (const effect of effects) {
+    if (triggeredGoal && ["confettihorn", "partyface"].includes(effect.id))
+      markActivated(state, effect);
+  }
+  if (!triggeredGoal) {
     for (const event of state.events) {
       for (let i = 0; i < (event.snailCount ?? 0); i++) {
         const reward = randomTrinket(state, ["common", "uncommon"]);
         event.note = [event.note, `Gained ${reward.name}`]
           .filter(Boolean)
           .join("\n");
-        const owner = snapshot.find((t) => t.id === event.id);
-        if (owner) markActivated(state, owner);
+        const uid = event.snailOwnerUids?.[i];
+        if (uid != null) markActivated(state, { uid });
       }
     }
   }
-  const rewardFactor =
-    1.3 ** count(state, "confettihorn") *
-    1.7 ** count(state, "partyface") *
-    state.events.reduce(
-      (factor, event) => factor * (event.rewardFactor ?? 1),
-      1,
+  // Package and its Falling Leaves payouts also resolve before the inactivity snapshot.
+  const packages = trinketEffects(state).filter(
+    (effect) => effect.id === "package",
+  );
+  if (packages.length && packageMatches(state)) {
+    for (const effect of packages) markActivated(state, effect);
+    openPackage(
+      state,
+      packages.map((effect) => effect.owner),
     );
+    for (const effect of packages) {
+      const event = state.events.find(
+        (event) => event.ownerUid === effect.owner.uid,
+      );
+      if (event)
+        event.note =
+          "Password matched: transformed this stack and its neighbors";
+    }
+  }
+  state.events.push(...state.pendingEvents.slice(pendingCount));
+  const stacks = inactiveTrinketStacks(state);
+  const inactiveCount = stacks.reduce((sum, stack) => sum + stack.count, 0);
+  for (const event of deferred.values()) {
+    event.silentStacks = stacks.map((stack) => ({ ...stack }));
+    event.multiplier = 1.1 ** (inactiveCount * event.silentCount);
+    const before = points;
+    const lines = [];
+    for (const [index, stack] of stacks.entries()) {
+      const factor = 1.1 ** (stack.count * event.silentCount);
+      const name = `${ITEMS[stack.id].name}${stack.count > 1 ? ` ×${stack.count}` : ""}`;
+      const line = `${name}: didn't trigger · ×${Number(factor.toPrecision(10))}`;
+      lines.push(line);
+      const after =
+        index === stacks.length - 1
+          ? before * event.multiplier
+          : points * factor;
+      event.steps.push({
+        reels: [],
+        points: after - points,
+        note: lines.join("\n"),
+      });
+      points = after;
+    }
+    event.points = points - before;
+    event.note = lines.length
+      ? lines.join("\n")
+      : "All eligible trinkets activated.";
+    if (event.id !== "silent") event.note = `The Silent:\n${event.note}`;
+    for (const uid of event.silentOwnerUids) markActivated(state, { uid });
+    state.events.push(event);
+  }
+  // Round once after all multipliers so totals, history, and rewards agree.
+  points = Math.round(points);
+  state.points = points;
   const goalReward = Math.ceil(bonusFor(state.round) * rewardFactor);
   const bonus =
     points >= goalFor(state.round)
       ? goalReward + 50 * state.reels.filter((n) => n === "W").length
       : 0;
-  if (bonus) {
-    passiveActivated(state, "confettihorn");
-    passiveActivated(state, "partyface");
-  }
   let runningBonus = points >= goalFor(state.round) ? goalReward : 0;
   state.reels.forEach((value, index) => {
     if (value !== "W") return;
@@ -1298,28 +1465,14 @@ export function settleSpin(state) {
   });
   state.bank += bonus + allowanceFor(state.round);
   state.total += points;
-  for (const event of state.events) {
-    for (let i = 0; i < (event.frogCount ?? 0); i++) {
-      const interest = Math.ceil(state.total * 0.02);
-      state.total += interest;
-      event.totalPoints = (event.totalPoints ?? 0) + interest;
-      event.note = `+${event.totalPoints} interest on total score`;
-      event.steps.push({ reels: [], points: interest, totalOnly: true });
-      const owner = snapshot.find((t) => t.id === event.id);
-      if (owner && interest) markActivated(state, owner);
-    }
-  }
   state.history.push({
     round: state.round,
     reels: [...state.reels],
     points,
+    triggerPoints,
     bonus,
   });
-  if (snapshot.some((item) => item.id === "package") && packageMatches(state)) {
-    openPackage(state);
-    const event = state.events.find((event) => event.id === "package");
-    if (event) event.note = "Password matched: transformed all trinkets";
-  }
+  delete state.silentContext;
   state.pendingEvents = [];
   state.phase = state.round === TOTAL_SPINS ? "finished" : "scored";
   return true;
@@ -1354,42 +1507,28 @@ function choose(pool, rng, boost = 1) {
   );
 }
 
-/**
- * Ranks a fixed catalog with weighted random priorities, then selects an eligible item.
- * Every catalog entry consumes a draw, even when unavailable. Removing an unselected
- * item therefore changes neither the winner nor the position of the saved RNG.
- */
-function chooseShopItem(catalog, pool, rng, weightFor) {
-  const eligible = new Map(pool.map((item) => [item.id, item]));
-  let selected;
-  let best = Infinity;
-  for (const def of catalog) {
-    const roll = 1 - rng();
-    const item = eligible.get(def.id);
-    if (!item) continue;
-    const weight = weightFor(def);
-    if (weight <= 0) continue;
-    const priority = -Math.log(roll) / weight;
-    if (priority < best) {
-      best = priority;
-      selected = item;
-    }
-  }
-  return selected;
+/** Applies item preferences after the shop has already rolled a rarity. */
+function shopItemWeight(def) {
+  return def.id === "dud" ? 0.1 : 1;
 }
 
-/** Uses fixed catalog rarity counts so ownership cannot redistribute item weights. */
-function shopItemWeight(def, boost, state = null) {
-  const catalog = def.kind === "tool" ? TOOLS : availableTrinkets;
-  return (
-    (RARITIES[def.rarity].weight *
-      (def.id === "dud" ? 0.1 : 1) *
-      (state && EXPERIMENTS.includes(def.id)
-        ? 10 ** count(state, "scientist")
-        : 1) *
-      (["rare", "legendary"].includes(def.rarity) ? boost : 1)) /
-    catalog.filter((item) => item.rarity === def.rarity).length
-  );
+/** Each Scientist ability supplies a slot that can offer even an owned Experiment. */
+function addExperimentOffers(state, offers, amount) {
+  if (amount <= 0) return;
+  state.shopRngState ??= hash(`${state.seed}:shop`);
+  const rng = () => nextRandom(state, "shopRngState");
+  const pool = availableTrinkets.filter((def) => EXPERIMENTS.includes(def.id));
+  for (let slot = 0; slot < amount; slot++) {
+    const def = chooseShopItem(availableTrinkets, pool, rng);
+    offers.push({
+      id: def.id,
+      kind: "trinket",
+      rarity: def.rarity,
+      price: itemPrice(def),
+      sold: false,
+      experiment: true,
+    });
+  }
 }
 
 /**
@@ -1409,7 +1548,7 @@ export function generateOffers(state) {
     [...state.trinkets, ...state.tools].map((item) => item.id),
   );
   for (let slot = 0; slot < 2 + count(state, "backpack"); slot++) {
-    const def = chooseShopItem(
+    const def = chooseShopOffer(
       availableTrinkets,
       availableTrinkets.filter(
         (t) =>
@@ -1419,7 +1558,8 @@ export function generateOffers(state) {
             t.rarity === "legendary"),
       ),
       rng,
-      (def) => shopItemWeight(def, boost, state),
+      boost,
+      shopItemWeight,
     );
     offers.push(
       def
@@ -1437,19 +1577,20 @@ export function generateOffers(state) {
     TOOLS.filter((t) => !owned.has(t.id)).length / TOOLS.length;
   const offerTool = rng() < TOOL_CHANCE * percentToolsNotOwned;
   // Rank both catalogs regardless of the chosen kind to keep later draws aligned.
-  const tool = chooseShopItem(
+  const tool = chooseShopOffer(
     TOOLS,
     TOOLS.filter((t) => !owned.has(t.id)),
     rng,
-    (def) => shopItemWeight(def, boost * 1.5 ** count(state, "graduate")),
+    boost * 1.5 ** count(state, "graduate"),
   );
-  const trinket = chooseShopItem(
+  const trinket = chooseShopOffer(
     availableTrinkets,
     availableTrinkets.filter(
       (t) => canOffer(state, t.id) && !offers.some((o) => o.id === t.id),
     ),
     rng,
-    (def) => shopItemWeight(def, boost, state),
+    boost,
+    shopItemWeight,
   );
   const mixed = offerTool ? tool : trinket;
   const kind = offerTool ? "tool" : "trinket";
@@ -1484,15 +1625,11 @@ export function generateOffers(state) {
       });
   }
   for (let slot = 0; slot < 1 + count(state, "hammer"); slot++) {
-    const upgrade = chooseShopItem(
+    const upgrade = chooseShopOffer(
       TOOLS,
       state.tools,
       rng,
-      (def) =>
-        RARITIES[def.rarity].weight *
-        (["rare", "legendary"].includes(def.rarity)
-          ? boost * 4 ** count(state, "mechanical-arm")
-          : 1),
+      boost * 4 ** count(state, "mechanical-arm"),
     );
     const upgradeDef = upgrade && ITEMS[upgrade.id];
     offers.push(
@@ -1519,6 +1656,7 @@ export function refreshShopOffers(state) {
     const slot = fresh.findIndex(
       (candidate) =>
         candidate.kind === offer.kind &&
+        Boolean(candidate.experiment) === Boolean(offer.experiment) &&
         Boolean(candidate.copy) === Boolean(offer.copy),
     );
     if (slot >= 0) fresh.splice(slot, 1);
@@ -1581,6 +1719,7 @@ export function buy(state, index) {
   )
     return false;
   const packageCount = state.packageActivations ?? 0;
+  const scientistCount = count(state, "scientist");
   if (offer.kind === "upgrade") {
     const tool = state.tools.find((t) => t.id === offer.id);
     if (!tool) return false;

@@ -36,6 +36,7 @@ import { BackgroundMusic, GameAudio } from "./audio.js";
 import { animateCount } from "./animation.js";
 import { divisibilityStatus } from "./scoring.js";
 import { trinketStacks } from "./effects.js";
+import { revealInventoryItem } from "./inventory-reveal.js";
 
 const sound = new GameAudio();
 const recordPlayer = document.querySelector("#record-player");
@@ -127,6 +128,7 @@ let state = null,
   calendar = {},
   saved = readSave(),
   scoreWait;
+let inventoryRevealCleanups = [];
 /** Returns the number of Package activations for sound deduplication. */
 const packageActivations = () => state?.packageActivations ?? 0;
 /** Plays the Package cue when an action activated its effect. */
@@ -294,7 +296,9 @@ function readSave() {
         (t) =>
           ITEMS[t.id]?.kind === "trinket" &&
           t.metadata &&
-          Object.values(t.metadata).every((value) => value === null || Number.isFinite(value)),
+          Object.values(t.metadata).every(
+            (value) => value === null || Number.isFinite(value),
+          ),
       )
     )
       return null;
@@ -307,7 +311,10 @@ function readSave() {
           Number.isInteger(t.uses) &&
           t.uses >= 0 &&
           Number.isFinite(t.uses) &&
-          (t.savedValue == null || (Number.isInteger(t.savedValue) && t.savedValue >= 0 && t.savedValue <= 9)),
+          (t.savedValue == null ||
+            (Number.isInteger(t.savedValue) &&
+              t.savedValue >= 0 &&
+              t.savedValue <= 9)),
       )
     )
       return null;
@@ -581,8 +588,6 @@ function inventory() {
           const selectedClass = ui.selected === item.id ? "selected" : "";
           const exhaustedClass =
             isTool && editing && !item.uses ? "exhausted" : "";
-          const usesLabel =
-            isTool && editing ? ` ${item.uses} uses remaining.` : "";
           const pressedAttribute =
             isTool && editing
               ? `aria-pressed="${ui.selected === item.id}"`
@@ -593,7 +598,7 @@ function inventory() {
               data-item="${item.id}"
               data-inventory-index="${index}"
               data-action="${isTool ? "tool" : "inspect"}"
-              aria-label="${esc(name)}. ${esc(itemDescription(item))}${usesLabel}"
+              aria-label="${esc(name)}. ${esc(itemDescription(item))}"
               ${pressedAttribute}
             >
               <img src="${iconPath(item.id)}" alt="" width="70" height="70">
@@ -680,8 +685,9 @@ function offers(animateSpawn = false) {
           </div>
         `;
       const def = ITEMS[offer.id];
-      const kindLabel =
-        offer.kind === "upgrade"
+      const kindLabel = offer.experiment
+        ? "EXPERIMENT"
+        : offer.kind === "upgrade"
           ? "TOOL UPGRADE"
           : offer.kind === "tool"
             ? "NEW TOOL"
@@ -829,7 +835,8 @@ function renderGame({ animateOffers = false } = {}) {
                 : def.target === "tool"
                   ? "choose another tool"
                   : def.id === "jar"
-                    ? state.tools.find((t) => t.id === "jar")?.savedValue != null
+                    ? state.tools.find((t) => t.id === "jar")?.savedValue !=
+                      null
                       ? "choose a reel for your saved number"
                       : "choose a number to save for a later use"
                     : "choose a reel"
@@ -897,6 +904,8 @@ function renderGame({ animateOffers = false } = {}) {
  * @param {{focus?: boolean, animate?: boolean, animateOffers?: boolean}} [options] Render behavior.
  */
 function render({ focus = false, animate = true, animateOffers = false } = {}) {
+  for (const cleanup of inventoryRevealCleanups) cleanup();
+  inventoryRevealCleanups = [];
   const scrolls = Object.fromEntries(
     [...document.querySelectorAll(".bin")].map((el) => [el.id, el.scrollLeft]),
   );
@@ -908,18 +917,29 @@ function render({ focus = false, animate = true, animateOffers = false } = {}) {
     const bin = document.getElementById(id);
     if (bin) bin.scrollTo({ left, behavior: "instant" });
   }
-  if (state?.revealTrinket && !ui.menu) {
-    const item = document.querySelector(
-      `#trinkets-bin [data-item="${state.revealTrinket}"]`,
-    );
-    item?.scrollIntoView({
-      block: "nearest",
-      inline: "center",
-      behavior: reducedMotion.matches ? "instant" : "smooth",
-    });
-    item?.classList.add("new-item");
-    delete state.revealTrinket;
-  }
+  if (state && !ui.menu)
+    for (const [kind, key] of [
+      ["trinkets", "revealTrinket"],
+      ["tools", "revealTool"],
+    ]) {
+      const run = state,
+        id = run[key];
+      if (!id) continue;
+      if (!run[kind].some((item) => item.id === id)) {
+        delete run[key];
+        continue;
+      }
+      const bin = document.getElementById(`${kind}-bin`);
+      const item = bin?.querySelector(`[data-item="${id}"]`);
+      inventoryRevealCleanups.push(
+        revealInventoryItem(bin, item, {
+          instant: reducedMotion.matches,
+          onComplete() {
+            if (run[key] === id) delete run[key];
+          },
+        }),
+      );
+    }
   if (focus)
     app
       .querySelector(".action-area .button:not(:disabled), .menu .play")
@@ -1146,7 +1166,11 @@ async function doScore() {
     const ledger = row.querySelector(".log-points");
     row.classList.add("scoring-active");
     log.scrollTop = log.scrollHeight;
-    if (event.cashOnly || ["w", "octopus"].includes(event.id) || event.message) {
+    if (
+      event.cashOnly ||
+      ["w", "octopus"].includes(event.id) ||
+      event.message
+    ) {
       for (const index of event.reels ?? [])
         if (!reducedMotion.matches)
           reelNodes[index].classList.add("scoring-hit");
@@ -1171,7 +1195,9 @@ async function doScore() {
               reels: event.reels ?? [],
               points: event.points - event.previewPoints,
             },
-          ].filter((step) => step.points !== 0).concat((event.steps ?? []).filter((step) => step.totalOnly))
+          ]
+            .filter((step) => step.points !== 0)
+            .concat((event.steps ?? []).filter((step) => step.totalOnly))
         : (event.steps ??
           (event.points ? [{ reels: [], points: event.points }] : []));
     for (const step of steps) {
@@ -1197,7 +1223,8 @@ async function doScore() {
         /** Updates the visible ledger and totals for this animation frame. */
         update(value) {
           ledger.textContent = number(value);
-          ui.displayPoints = pointsBefore + (step.totalOnly ? 0 : value - previous);
+          ui.displayPoints =
+            pointsBefore + (step.totalOnly ? 0 : value - previous);
           ui.displayTotal = totalBefore + value - previous;
           pointsNode.textContent = number(ui.displayPoints);
           totalNode.textContent = number(ui.displayTotal);
@@ -1408,7 +1435,9 @@ async function applyInventoryTool(id) {
   playPackageSound(packageCount);
   if (camera) sound.play("camera");
   else if (ui.selected === "atm") sound.play("atm");
-  else if (ui.selected === "mirror") sound.play("mirror");
+  else if (ui.selected === "mirror" || ui.selected === "magicwand")
+    sound.play("mirror");
+  else if (ui.selected === "pawn") sound.play("pawn");
   ui.selected = null;
   ui.source = null;
   ui.busy = camera;
@@ -1775,6 +1804,7 @@ app.addEventListener("click", async (event) => {
       const index = Number(el.dataset.offer),
         offer = state.offers[index],
         previousTrinketCount = state.trinkets.length,
+        previousTools = state.tools.map((tool) => ({ ...tool })),
         packageCount = packageActivations();
       if (!buy(state, index)) {
         sound.play("error");
@@ -1786,29 +1816,34 @@ app.addEventListener("click", async (event) => {
         gainedTrinkets.length > 1
           ? `${ITEMS[offer.id].name} ${offer.id === "test-tube" ? "copied" : "gained"} ${ITEMS[gainedTrinkets.at(-1).id].name}.`
           : "";
+      if (offer.id === "toolexp") {
+        const gainedTool = state.tools[previousTools.length];
+        if (gainedTool)
+          ui.purchaseResult = `${ITEMS[offer.id].name} gained ${ITEMS[gainedTool.id].name}.`;
+      }
+      if (offer.id === "upgradeexp") {
+        const upgradedTool = state.tools.find(
+          (tool, index) => tool.maxUses > previousTools[index]?.maxUses,
+        );
+        if (upgradedTool)
+          ui.purchaseResult = `${ITEMS[offer.id].name} upgraded ${ITEMS[upgradedTool.id].name}.`;
+      }
+      const kind = offer.kind === "trinket" ? "trinkets" : "tools";
+      const targetId =
+        kind === "trinkets" && gainedTrinkets.length
+          ? gainedTrinkets.at(-1).id
+          : offer.id;
+      state[kind === "trinkets" ? "revealTrinket" : "revealTool"] = targetId;
       sound.play("buy");
       persist();
       render({ animate: false });
-      const bin = document.querySelector(
-        `#${offer.kind === "trinket" ? "trinkets" : "tools"}-bin`,
-      );
-      for (let i = previousTrinketCount; i < state.trinkets.length; i++)
-        bin
-          .querySelector(`[data-inventory-index="${i}"]`)
+      for (const item of gainedTrinkets)
+        document
+          .querySelector(`#trinkets-bin [data-item="${item.id}"]`)
           ?.classList.add("new-item");
-      const item = gainedTrinkets.length
-        ? bin.querySelector(`[data-item="${gainedTrinkets.at(-1).id}"]`)
-        : bin.querySelector(`[data-item="${offer.id}"]`);
-      if (!item) break;
-      item.classList.add("new-item");
-      bin.scrollTo({
-        left:
-          item.offsetLeft -
-          bin.offsetLeft -
-          (bin.clientWidth - item.clientWidth) / 2,
-        behavior: reducedMotion.matches ? "instant" : "smooth",
-      });
-      item.focus({ preventScroll: true });
+      document
+        .querySelector(`#${kind}-bin [data-item="${targetId}"]`)
+        ?.focus({ preventScroll: true });
       break;
     }
     case "reroll-shop":

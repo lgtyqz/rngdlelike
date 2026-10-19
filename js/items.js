@@ -1,12 +1,12 @@
 export const RARITIES = {
   fallback: { label: "Fallback", weight: 0, price: 0 },
   token: { label: "Token", weight: 0, price: 0 },
-  common: { label: "Common", weight: 60, price: 17 },
-  uncommon: { label: "Uncommon", weight: 27, price: 34 },
-  rare: { label: "Rare", weight: 10, price: 56 },
-  legendary: { label: "Legendary", weight: 3, price: 122 },
+  common: { label: "Common", weight: 50, price: 17 },
+  uncommon: { label: "Uncommon", weight: 30, price: 34 },
+  rare: { label: "Rare", weight: 16, price: 56 },
+  legendary: { label: "Legendary", weight: 4, price: 122 },
 };
-// Imported from data/catalog/*.csv; IDs and wording follow the source sheets.
+// Catalog descriptions are kept in sync with data/catalog/*.csv.
 export const TRINKETS = [
   {
     id: "even",
@@ -228,7 +228,7 @@ export const TRINKETS = [
     emoji: "🤓",
     rarity: "legendary",
     effect: "nerd",
-    description: "Score 42 points and gain $24 for each 0 or 1 I score.",
+    description: "Score 100 points and gain $24 for each 0 or 1 I score.",
     kind: "trinket",
     metadata: {},
   },
@@ -236,10 +236,10 @@ export const TRINKETS = [
     id: "hotface",
     name: "Heat Miser",
     emoji: "🥵",
-    rarity: "uncommon",
+    rarity: "common",
     effect: "hotface",
     description:
-      "Every warm number (8,9,0,1,2) increases the points I give on every spin by 4.",
+      "Every warm number (8,9,0,1,2) increases the points I give on every spin by 3.",
     kind: "trinket",
     metadata: {
       power: 0,
@@ -249,10 +249,10 @@ export const TRINKETS = [
     id: "coldface",
     name: "Cold Miser",
     emoji: "🥶",
-    rarity: "uncommon",
+    rarity: "common",
     effect: "coldface",
     description:
-      "Every cold number (3,4,5,6,7) increases the points I give on every spin by 4.",
+      "Every cold number (3,4,5,6,7) increases the points I give on every spin by 3.",
     kind: "trinket",
     metadata: {
       power: 0,
@@ -276,7 +276,7 @@ export const TRINKETS = [
     rarity: "legendary",
     effect: "realknife",
     description:
-      "Every nine 9s you see guarantees a Legendary Trinket in the next shop.",
+      "Every nine 9s you see guarantees a Legendary Trinket in the next shop. (Though if you have all of them, nothing will come of it.)",
     kind: "trinket",
     metadata: {
       count: 0,
@@ -529,7 +529,7 @@ export const TRINKETS = [
     rarity: "rare",
     effect: "package",
     description:
-      "Score the password to transform ALL your trinkets, including this one, into random trinkets one rarity higher. Legendary trinkets transform into other unowned Legendaries.",
+      "Score the password to transform every stack of trinkets up to 3 spaces away into random trinkets one rarity higher. (Skips Tokens)",
     kind: "trinket",
     metadata: {},
   },
@@ -605,7 +605,7 @@ export const TRINKETS = [
     rarity: "common",
     effect: "bean",
     description:
-      "Score 1 point for each 1, then increase the number of points I score by 5.",
+      "Each 1 scores my current power, then permanently adds 5 power. Starts at 1 power.",
     kind: "trinket",
     metadata: {
       power: 1,
@@ -713,7 +713,8 @@ export const TRINKETS = [
     emoji: "🏁",
     rarity: "rare",
     effect: "checkered-flag",
-    description: "Scores 30% of this round's goal.",
+    description:
+      "Scores 30% of this round's goal. Applies after all other trinkets.",
     kind: "trinket",
     metadata: {},
   },
@@ -775,7 +776,7 @@ export const TRINKETS = [
     rarity: "common",
     effect: "robot",
     description:
-      "Scores 101 (5) points every spin. When Robot sees a 0 or 1, permanently increase the points this gives by 10 (2).",
+      "Scores 5 (101 in binary) points every spin. When Robot sees a 0 or 1, permanently increase the points this gives by 2 (10 in binary).",
     kind: "trinket",
     metadata: {
       power: 5,
@@ -807,9 +808,11 @@ export const TRINKETS = [
     emoji: "🧪",
     rarity: "rare",
     effect: "test-tube",
-    description: "Gain a copy of a random trinket you have.",
+    description:
+      "When acquired, copy a random trinket you own. (Ironically, cannot replicate Experiments.)",
     kind: "trinket",
     metadata: {},
+    price: 30,
   },
   {
     id: "alembic",
@@ -820,6 +823,7 @@ export const TRINKETS = [
     description: "Gain a random trinket. (Ignores rarities)",
     kind: "trinket",
     metadata: {},
+    price: 30,
   },
   {
     id: "anxious",
@@ -828,7 +832,7 @@ export const TRINKETS = [
     rarity: "rare",
     effect: "anxious",
     description:
-      "When I see every number from 0 to 9 in order, create a Legendary Trinket, then transform into Relaxed Face. Currently looking for:",
+      "When you land on every number from 0 to 9 in order, create a Legendary Trinket, then transform into Relaxed Face. Currently looking for:",
     kind: "trinket",
     metadata: {
       nextDigit: 0,
@@ -840,7 +844,8 @@ export const TRINKETS = [
     emoji: "🧮",
     rarity: "uncommon",
     effect: "abacus",
-    description: "If you've used tools exactly 5 times this spin, gain +$45.",
+    description:
+      "If you've used tools exactly 5 times this spin, score 100 points and gain $20.",
     kind: "trinket",
     metadata: {},
   },
@@ -850,7 +855,7 @@ export const TRINKETS = [
     emoji: "🦜",
     rarity: "legendary",
     effect: "parrot",
-    description: "Copies the ability of ALL your common and uncommon trinkets.",
+    description: "Has the ability of ALL your common and uncommon trinkets.",
     kind: "trinket",
     metadata: {},
   },
@@ -858,10 +863,9 @@ export const TRINKETS = [
     id: "scientist",
     name: "Scientist",
     emoji: "🧑‍🔬",
-    rarity: "legendary",
+    rarity: "rare",
     effect: "scientist",
-    description:
-      "Greatly increases your chance of finding Experiments, AND allows you to have multiple Experiments.",
+    description: "Experiments you already own can appear again in shops.",
     kind: "trinket",
     metadata: {},
   },
@@ -872,7 +876,7 @@ export const TRINKETS = [
     rarity: "legendary",
     effect: "silent",
     description:
-      "When you score your spin, multiply your score by 1.2x for every trinket that DIDN'T activate.",
+      "When you score your spin, multiply your score by 1.1x for every trinket that DIDN'T activate.",
     kind: "trinket",
     metadata: {},
   },
@@ -903,7 +907,7 @@ export const TRINKETS = [
     emoji: "🤪",
     rarity: "token",
     effect: "dormant3",
-    description: "Multiply your score by 67 for every 67 in your number.",
+    description: 'Multiply your score by 67 for every "67" in your number.',
     kind: "trinket",
     metadata: {},
   },
@@ -911,7 +915,7 @@ export const TRINKETS = [
     id: "fax",
     name: "Fax Machine",
     emoji: "📠",
-    rarity: "rare",
+    rarity: "uncommon",
     effect: "fax",
     description: "Copy the ability of the trinket to the right of me.",
     kind: "trinket",
@@ -953,7 +957,7 @@ export const TRINKETS = [
     emoji: "🐀",
     rarity: "uncommon",
     effect: "rat",
-    description: "For every three 3s you score, gain a Common trinket.",
+    description: "For every three 3s scored, gain an Uncommon or Rare trinket.",
     kind: "trinket",
     metadata: {
       count: 0,
@@ -963,10 +967,10 @@ export const TRINKETS = [
     id: "mechanic",
     name: "Mechanic",
     emoji: "🧑‍🔧",
-    rarity: "rare",
+    rarity: "uncommon",
     effect: "mechanic",
     description:
-      "After each spin, gain +$100. Reduce the payout by $7 each time you've used a tool this spin (min. $0).",
+      "After each spin, gain +$60. Reduce the payout by $6 each time you've used a tool this spin (min. $0).",
     kind: "trinket",
     metadata: {},
   },
@@ -979,6 +983,7 @@ export const TRINKETS = [
     description: "Gain a random Tool upgrade. (ignores rarities)",
     kind: "trinket",
     metadata: {},
+    price: 30,
   },
   {
     id: "toolexp",
@@ -989,6 +994,7 @@ export const TRINKETS = [
     description: "Gain a random Rare Tool.",
     kind: "trinket",
     metadata: {},
+    price: 30,
   },
   {
     id: "frog",
@@ -997,7 +1003,7 @@ export const TRINKETS = [
     rarity: "token",
     effect: "frog",
     description:
-      "After each spin, adds 2% interest to your total score. Immune to Science (cannot be targeted by experiments).",
+      "After each spin, gain $10. Immune to Science (cannot be targeted by experiments).",
     kind: "trinket",
     metadata: {},
   },
@@ -1018,7 +1024,7 @@ export const TRINKETS = [
     rarity: "legendary",
     effect: "chick",
     description:
-      "Scores 200 points each spin. When you have 2 bugs, I eat them and grow up.",
+      "Scores 200 points each spin. When you have 2 bugs when you score, I eat them and grow up.",
     kind: "trinket",
     metadata: {},
   },
@@ -1029,7 +1035,7 @@ export const TRINKETS = [
     rarity: "token",
     effect: "phoenix",
     description:
-      "Repeat the ability of ALL your trinkets this spin, then reincarnate me.",
+      "Repeat the ability of the three highest-scoring trinkets this spin, then reincarnate me.",
     kind: "trinket",
     metadata: {},
   },
@@ -1037,10 +1043,10 @@ export const TRINKETS = [
     id: "numbers",
     name: "Numbers",
     emoji: "🔢",
-    rarity: "rare",
+    rarity: "uncommon",
     effect: "numbers",
     description:
-      "When I see every number from 0 to 9 in order, create a Rare Trinket. Currently looking for:",
+      "When you land on every number from 0 to 9 in order, create a Rare Trinket. Currently looking for:",
     kind: "trinket",
     metadata: {
       nextDigit: 0,
@@ -1081,6 +1087,17 @@ export const TRINKETS = [
     description: "When you reroll the shop, gain $9.",
     kind: "trinket",
     metadata: {},
+  },
+  {
+    id: "waningcrescent",
+    name: "Waning Crescent",
+    emoji: "🌘",
+    rarity: "common",
+    effect: "waningcrescent",
+    description: "Score 200 points for every grey (non-numeric) slot.",
+    kind: "trinket",
+    metadata: {},
+    price: 21,
   },
 ];
 export const TOOLS = [
@@ -1162,7 +1179,8 @@ export const TOOLS = [
     emoji: "🐈",
     rarity: "rare",
     effect: "copy",
-    description: "Select a reel to copy, then a different reel to copy onto.",
+    description:
+      "Copy one reel's displayed value onto a different reel this spin.",
     kind: "tool",
     maxUses: 1,
     limitedUse: false,
@@ -1174,7 +1192,7 @@ export const TOOLS = [
     emoji: "🌀",
     rarity: "uncommon",
     effect: "bigreroll",
-    description: "Select a reel to reroll, then reroll the reels next to it.",
+    description: "Reroll a reel and both its neighbors. Wraps around!",
     kind: "tool",
     maxUses: 2,
     limitedUse: false,
@@ -1222,7 +1240,8 @@ export const TOOLS = [
     emoji: "🗣️",
     rarity: "legendary",
     effect: "echo",
-    description: "Copy a reel's digit to both its neighbors.",
+    description:
+      "Copy a reel's displayed value onto both neighbors for this spin. Wraps around!",
     kind: "tool",
     maxUses: 1,
     limitedUse: false,
@@ -1248,7 +1267,7 @@ export const TOOLS = [
     rarity: "rare",
     effect: "w",
     description:
-      "Permanently replace a reel slot with a W. Landing on a W increases the cash bonus for the round by $50.",
+      "Permanently replace the displayed reel slot with W. Each W on the final board adds $50 to your cash reward if you meet the goal.",
     kind: "tool",
     maxUses: 3,
     limitedUse: true,
@@ -1260,7 +1279,8 @@ export const TOOLS = [
     emoji: "📸",
     rarity: "legendary",
     effect: "camera",
-    description: "Activate a trinket's ablity.",
+    description:
+      "Trigger a non-passive trinket's abilities using the current reels.",
     kind: "tool",
     maxUses: 1,
     limitedUse: false,
@@ -1272,7 +1292,8 @@ export const TOOLS = [
     emoji: "🧼",
     rarity: "uncommon",
     effect: "soap",
-    description: "Remove a slot from a reel, permanently.",
+    description:
+      "Permanently remove the displayed slot from a reel, leaving it blank until changed or rerolled.",
     kind: "tool",
     maxUses: 4,
     limitedUse: true,
@@ -1348,8 +1369,7 @@ export const TOOLS = [
     emoji: "✨",
     rarity: "rare",
     effect: "sparkles",
-    description:
-      "Permanently change a trinket into another with one higher rarity.",
+    description: "Permanently change a trinket into another one rarity higher.",
     kind: "tool",
     maxUses: 1,
     limitedUse: true,
@@ -1385,7 +1405,7 @@ export const TOOLS = [
     emoji: "♟️",
     rarity: "rare",
     effect: "pawn",
-    description: "Sell a trinket for $10.",
+    description: "Sell a trinket for $35.",
     kind: "tool",
     maxUses: 1,
     limitedUse: false,
@@ -1395,7 +1415,7 @@ export const TOOLS = [
     id: "jar",
     name: "Jar",
     emoji: "🫙",
-    rarity: "rare",
+    rarity: "uncommon",
     effect: "jar",
     description: "Pick a number to save for later.",
     kind: "tool",
@@ -1422,7 +1442,7 @@ export const TOOLS = [
     rarity: "rare",
     effect: "magicwand",
     description:
-      "Permanently transform a trinket into a Frog that adds 2% interest to your TOTAL score after each spin. (Frogs are also immune to science!)",
+      "Permanently transform a trinket into a Frog that gives you $10 after each spin. (Frogs are also immune to science!)",
     kind: "tool",
     maxUses: 1,
     limitedUse: false,
@@ -1435,9 +1455,9 @@ export const TOOLS = [
     rarity: "legendary",
     effect: "razor",
     description:
-      "Spend $30 to permanently remove a slot from a reel (Blades are expensive!)",
+      "Spend $10 to permanently remove the displayed reel slot, leaving it blank until changed or rerolled. (Blades are expensive!)",
     kind: "tool",
-    maxUses: 1,
+    maxUses: 2,
     limitedUse: false,
     target: "reel",
   },
@@ -1445,9 +1465,10 @@ export const TOOLS = [
     id: "trollingstone",
     name: "Rolling Stone",
     emoji: "🪨",
-    rarity: "rare",
+    rarity: "uncommon",
     effect: "trollingstone",
-    description: "Permanently remove a slot from a reel that is 2 or less.",
+    description:
+      "Permanently remove the displayed reel slot if its digit is 2 or less, leaving the reel blank until changed or rerolled.",
     kind: "tool",
     maxUses: 1,
     limitedUse: false,
@@ -1457,9 +1478,10 @@ export const TOOLS = [
     id: "cutdown",
     name: "Cut Down to Size",
     emoji: "🪚",
-    rarity: "rare",
+    rarity: "uncommon",
     effect: "cutdown",
-    description: "Permanently remove a slot from a reel that is 7 or more.",
+    description:
+      "Permanently remove the displayed reel slot if its digit is 7 or more, leaving the reel blank until changed or rerolled.",
     kind: "tool",
     maxUses: 1,
     limitedUse: false,
@@ -1490,7 +1512,7 @@ export function ownItem(id) {
 /**
  * Builds the current player-facing description of an owned item.
  * @param {object} owned Owned trinket or tool instance.
- * @returns {string} Description including current power or uses per spin.
+ * @returns {string} Description including current power and remaining tool uses.
  */
 export function itemDescription(owned) {
   const def = ITEMS[owned.id];
@@ -1514,8 +1536,8 @@ export function itemDescription(owned) {
       : "") +
     (def.kind === "tool"
       ? def.limitedUse
-        ? `\n${owned.uses} uses left for this run.`
-        : `\n${owned.maxUses ?? def.maxUses} uses per spin.`
+        ? `\n${owned.uses ?? def.maxUses} uses left for this run.`
+        : `\n${owned.maxUses ?? def.maxUses} uses per spin. ${owned.uses ?? owned.maxUses ?? def.maxUses} uses remaining.`
       : "")
   );
 }
