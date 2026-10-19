@@ -1059,7 +1059,7 @@ export const TRINKETS = [
     rarity: "rare",
     effect: "monkey",
     description:
-      "Gives you $2 when it sees its favorite number, then picks a new favorite number.",
+      "Gives you $4 when it sees its favorite number, then picks a new favorite number.",
     kind: "trinket",
     metadata: {
       favorite: 0,
@@ -1460,6 +1460,7 @@ export const TOOLS = [
     maxUses: 2,
     limitedUse: false,
     target: "reel",
+    price: 50,
   },
   {
     id: "trollingstone",

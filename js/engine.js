@@ -428,20 +428,20 @@ function recordSeen(state, indices, abilities = null) {
         state.seenEvents.push({ index, id: item.owner.id, note });
       }
       if (item.id === "monkey" && value === item.metadata.favorite) {
-        state.bank += 2;
+        state.bank += 4;
         markActivated(state, item);
         item.metadata.favorite = Math.floor(effectRng(state, "monkey")() * 10);
         state.seenEvents.push({
           index,
           id: item.owner.id,
-          note: `+$2 · Favorite: ${item.metadata.favorite}`,
+          note: `+$4 · Favorite: ${item.metadata.favorite}`,
         });
         state.pendingEvents.push({
           id: item.owner.id,
           points: 0,
           cash: 2,
           multiplier: 1,
-          note: `+$2 · Favorite: ${item.metadata.favorite}`,
+          note: `+$4 · Favorite: ${item.metadata.favorite}`,
           steps: [],
           cashOnly: true,
         });
@@ -645,13 +645,13 @@ export function useTool(state, id, target, source = null) {
     case "trollingstone":
     case "cutdown": {
       const value = reelValue(old);
-      if (id === "razor" && state.bank < 30) return false;
+      if (id === "razor" && state.bank < 10) return false;
       if (
         id !== "razor" &&
         (!isDigit(value) || (id === "trollingstone" ? value > 2 : value < 7))
       )
         return false;
-      if (id === "razor") state.bank -= 30;
+      if (id === "razor") state.bank -= 10;
       pool.splice(position, 1);
       state.positions[target] = -1;
       state.reels[target] = null;
