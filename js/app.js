@@ -763,9 +763,14 @@ function offers(animateSpawn = false) {
   `;
 }
 
+/** Pure goal-bonus contributions use the same cash ledger as other payouts. */
+const isCashEvent = (event) => event.cashOnly || ["w", "octopus"].includes(event.id) ||
+  (event.goalBonusCash != null && !event.points && !hasMultiplier(event.multiplier));
+const eventCash = (event) => (event.cash ?? 0) + (event.goalBonusCash ?? 0);
+
 /** Returns one scoring-event row for the animated score log. */
 function logRow(event, pending = false) {
-  const isCashBonus = event.cashOnly || ["w", "octopus"].includes(event.id);
+  const isCashBonus = isCashEvent(event);
   const isMessageEvent = Boolean(event.message);
   return `
     <div class="log-row ${event.points || event.totalPoints || event.cash || hasMultiplier(event.multiplier) || isCashBonus || isMessageEvent ? "" : "missed"}">
@@ -777,7 +782,7 @@ function logRow(event, pending = false) {
         ${
           isMessageEvent
             ? `<span class="log-message">${esc(event.message)}</span>`
-            : `+${isCashBonus ? "$" : ""}<span class="log-points">${number(pending ? (event.previewPoints ?? 0n) : isCashBonus ? event.cash : event.points + (event.totalPoints ?? 0n))}</span>`
+            : `+${isCashBonus ? "$" : ""}<span class="log-points">${number(pending ? (event.previewPoints ?? 0n) : isCashBonus ? eventCash(event) : event.points + (event.totalPoints ?? 0n))}</span>`
         }
         ${event.note ? `<small class="log-note" ${pending ? "hidden" : ""}>${esc(event.note)}</small>` : ""}
       </div>
@@ -1186,16 +1191,12 @@ async function doScore() {
     const ledger = row.querySelector(".log-points");
     row.classList.add("scoring-active");
     log.scrollTop = log.scrollHeight;
-    if (
-      event.cashOnly ||
-      ["w", "octopus"].includes(event.id) ||
-      event.message
-    ) {
+    if (isCashEvent(event) || event.message) {
       for (const index of event.reels ?? [])
         if (!reducedMotion.matches)
           reelNodes[index].classList.add("scoring-hit");
-      if (event.cashOnly || ["w", "octopus"].includes(event.id)) {
-        row.querySelector(".log-points").textContent = number(event.cash);
+      if (isCashEvent(event)) {
+        row.querySelector(".log-points").textContent = number(eventCash(event));
         if (event.id === "w" && event.cash)
           subtitle.textContent = `goal bonus: +$${number(event.bonusTotal)}!`;
       }

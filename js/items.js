@@ -9,6 +9,7 @@ export const RARITIES = {
   legendary: { label: "Legendary", weight: 4, price: 122 },
 };
 // Catalog descriptions are kept in sync with data/catalog/*.csv.
+// pointScoring identifies direct point awards and round-score multipliers.
 export const TRINKETS = [
   {
     id: "even",
@@ -18,6 +19,7 @@ export const TRINKETS = [
     effect: "even",
     description: "Score 5 points for each even digit.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -28,6 +30,7 @@ export const TRINKETS = [
     effect: "odd",
     description: "Score 5 points for each odd digit.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -38,6 +41,7 @@ export const TRINKETS = [
     effect: "pair",
     description: "Score 8 points for each pair of digits.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -48,6 +52,7 @@ export const TRINKETS = [
     effect: "high",
     description: "Score 6 points for each digit higher than 6.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -58,6 +63,7 @@ export const TRINKETS = [
     effect: "low",
     description: "Score 6 points for each digit lower than 4.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -68,6 +74,7 @@ export const TRINKETS = [
     effect: "sum",
     description: "Score the sum of all 6 digits.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -79,6 +86,7 @@ export const TRINKETS = [
     description:
       "Score 35 points for each 3-digit sandwich (first and last digit are the same.)",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -89,6 +97,7 @@ export const TRINKETS = [
     effect: "brainrot1",
     description: "Score 67 points if you have a 6 and a 7.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -99,6 +108,7 @@ export const TRINKETS = [
     effect: "seven",
     description: "Every 7 scored gives $7.",
     kind: "trinket",
+    pointScoring: false,
   },
   {
     id: "bookends",
@@ -108,6 +118,7 @@ export const TRINKETS = [
     effect: "bookends",
     description: "Score 50 points if the first and last digits match.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -118,6 +129,7 @@ export const TRINKETS = [
     effect: "rainbow",
     description: "Score 9 points for each different digit.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -128,6 +140,7 @@ export const TRINKETS = [
     effect: "triple",
     description: "Score 150 points for every group of three matching digits.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -138,6 +151,7 @@ export const TRINKETS = [
     effect: "miniflush",
     description: "Score 200 points if you have 4 of the same number.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -148,6 +162,7 @@ export const TRINKETS = [
     effect: "flush",
     description: "Score 500 points if you have 5 of the same number.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -158,6 +173,7 @@ export const TRINKETS = [
     effect: "brainrot2",
     description: "Score 167 points if you have a 6 and then 7, in that order.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -168,6 +184,7 @@ export const TRINKETS = [
     effect: "brainrot3",
     description: "Multiply your score by 67 if you only have 6s or 7s.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
     price: 67,
   },
@@ -180,6 +197,7 @@ export const TRINKETS = [
     description:
       "Increases the chance of Rares and Legendaries in the shop by 25%.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -191,6 +209,7 @@ export const TRINKETS = [
     description:
       "Increases the chance of Rares and Legendaries in the shop by 50%.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -202,6 +221,7 @@ export const TRINKETS = [
     description:
       "Score 10,000 points and gain $78 if you score the most common password (123456, in order).",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -212,6 +232,7 @@ export const TRINKETS = [
     effect: "pig",
     description: "Gain $8 after each spin.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -222,6 +243,7 @@ export const TRINKETS = [
     effect: "stocks",
     description: "Gain $20 after each spin.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -232,6 +254,7 @@ export const TRINKETS = [
     effect: "nerd",
     description: "Score 100 points and gain $24 for each 0 or 1 I score.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -243,6 +266,7 @@ export const TRINKETS = [
     description:
       "Every warm number (8,9,0,1,2) increases the points I give on every spin by 3.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {
       power: 0,
     },
@@ -256,6 +280,7 @@ export const TRINKETS = [
     description:
       "Every cold number (3,4,5,6,7) increases the points I give on every spin by 3.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {
       power: 0,
     },
@@ -269,6 +294,7 @@ export const TRINKETS = [
     description:
       "8s have a 68% chance to trigger twice. (Each additional Eight Ball reduces the chance of no extra trigger by 68%.)",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -280,6 +306,7 @@ export const TRINKETS = [
     description:
       "Every nine 9s you see guarantees a Legendary Trinket in the next shop. (Though if you have all of them, nothing will come of it.)",
     kind: "trinket",
+    pointScoring: false,
     metadata: {
       count: 0,
     },
@@ -292,6 +319,7 @@ export const TRINKETS = [
     effect: "hundred",
     description: "Score 100 points if your number ends in two zeroes.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -302,6 +330,7 @@ export const TRINKETS = [
     effect: "cross",
     description: "Greatly reduce the chance to see the number 6.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -313,6 +342,7 @@ export const TRINKETS = [
     description:
       "If you have 3 numbers in a row that go sequentially up or down, score the product of those numbers.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -324,6 +354,7 @@ export const TRINKETS = [
     description:
       "If you have 4 or more numbers in a row that go sequentially up or down, score the product of those numbers.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -334,6 +365,7 @@ export const TRINKETS = [
     effect: "graduate",
     description: "Increases your chance to see Rare and Legendary tools.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -345,6 +377,7 @@ export const TRINKETS = [
     description:
       "If your last number is lower than your first number, gain $20 and score 40 points.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -356,6 +389,7 @@ export const TRINKETS = [
     description:
       "If your last number is higher than your first number, gain $20 and score 40 points.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -367,6 +401,7 @@ export const TRINKETS = [
     description:
       "I give 77 points each spin. If your final number is divisible by 7, permanently increase the points I give by 77.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {
       power: 77,
     },
@@ -380,6 +415,7 @@ export const TRINKETS = [
     description:
       "When you see eight 8s, gain a random trinket (ignores rarities).",
     kind: "trinket",
+    pointScoring: false,
     metadata: {
       count: 0,
     },
@@ -393,6 +429,7 @@ export const TRINKETS = [
     description:
       "I give 121 points each spin. If your final number is divisible by 11, permanently double the points I give.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {
       power: 121,
     },
@@ -406,6 +443,7 @@ export const TRINKETS = [
     description:
       "I give 13 points each spin. If your final number is divisible by 3, permanently increase the points I give by 13.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {
       power: 13,
     },
@@ -419,6 +457,7 @@ export const TRINKETS = [
     description:
       "Doubles your points if you have no 4s and have at least one 8.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -430,6 +469,7 @@ export const TRINKETS = [
     description:
       "If you don't meet the goal after a spin, gain a random common or uncommon trinket.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -440,6 +480,7 @@ export const TRINKETS = [
     effect: "fiver",
     description: "Score 25 points if your number is divisible by 5.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -450,6 +491,7 @@ export const TRINKETS = [
     effect: "zero",
     description: "Score 12 points for every zero.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -460,6 +502,7 @@ export const TRINKETS = [
     effect: "monocle",
     description: "If you have 6 of the same value, score 1000 points.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
     price: 77,
   },
@@ -472,6 +515,7 @@ export const TRINKETS = [
     description:
       "If all your numbers are strictly increasing or decreasing, score 456 points.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -482,6 +526,7 @@ export const TRINKETS = [
     effect: "wrench",
     description: "Tools are 50% cheaper.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -492,6 +537,7 @@ export const TRINKETS = [
     effect: "screwdriver",
     description: "Tool upgrades are 50% cheaper.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
     price: 43,
   },
@@ -503,6 +549,7 @@ export const TRINKETS = [
     effect: "constructionworker",
     description: "After each spin, gain a random tool upgrade.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -513,6 +560,7 @@ export const TRINKETS = [
     effect: "technologist",
     description: "After each spin is scored, gain a random tool.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -523,6 +571,7 @@ export const TRINKETS = [
     effect: "cartwheel",
     description: "Reroll tools have +3 uses each spin.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -534,6 +583,7 @@ export const TRINKETS = [
     description:
       "Score the password to transform every stack of trinkets up to 3 spaces away into random trinkets one rarity higher. (Skips Tokens)",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -544,6 +594,7 @@ export const TRINKETS = [
     effect: "bank",
     description: "Gain 10% interest when you enter a shop.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -555,6 +606,7 @@ export const TRINKETS = [
     description:
       "Picks a favorite number from your reels when you spin. Multiplies your points this round by 3 EVERY time it scores its favorite number.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {
       favorite: null,
     },
@@ -567,6 +619,7 @@ export const TRINKETS = [
     effect: "relaxedface",
     description: "Scores +24 points no matter what you spin.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
     price: 17,
   },
@@ -578,6 +631,7 @@ export const TRINKETS = [
     effect: "blackjack",
     description: "If your numbers sum to 21, triple your score this round.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -589,6 +643,7 @@ export const TRINKETS = [
     description:
       "Double your score this round if you have three of the same digit and two or more of a different digit.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -599,6 +654,7 @@ export const TRINKETS = [
     effect: "family",
     description: "Score 8 times the sum of all your digits.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -610,6 +666,7 @@ export const TRINKETS = [
     description:
       "Each 1 scores my current power, then permanently adds 5 power. Starts at 1 power.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {
       power: 1,
     },
@@ -622,6 +679,7 @@ export const TRINKETS = [
     effect: "dragon",
     description: "Scores +50 points each spin for each trinket you have.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -632,6 +690,7 @@ export const TRINKETS = [
     effect: "wheel",
     description: "Shop rerolls cost 2 less.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -643,6 +702,7 @@ export const TRINKETS = [
     description:
       "If you have two zeroes that aren't next to each other, score 21 times your highest digit.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -653,6 +713,7 @@ export const TRINKETS = [
     effect: "bicycle",
     description: "Rerolls cost 4 less.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -664,6 +725,7 @@ export const TRINKETS = [
     description:
       "Scores 10 points for each pair of numbers you have that sum to 10.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -674,6 +736,7 @@ export const TRINKETS = [
     effect: "clover",
     description: "Doubles your chance of rolling a 7.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -685,6 +748,7 @@ export const TRINKETS = [
     description:
       "When I see an 8, gain $8. Each eight 8s seen this round reduces this payout by $1, to a minimum of $0. Resets each round.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
     price: 88,
   },
@@ -697,6 +761,7 @@ export const TRINKETS = [
     description:
       "Scores 88 points if you have an equal number of odd and even numbers.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -708,6 +773,7 @@ export const TRINKETS = [
     description:
       "Every shop adds a copy of one of your trinkets at double price for sale (can't print printers though!).",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -719,6 +785,7 @@ export const TRINKETS = [
     description:
       "Scores 30% of this round's goal. Applies after all other trinkets.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -729,6 +796,7 @@ export const TRINKETS = [
     effect: "hammer",
     description: "Shops have one more tool upgrade.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -739,6 +807,7 @@ export const TRINKETS = [
     effect: "backpack",
     description: "Shops have one more trinket.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -750,6 +819,7 @@ export const TRINKETS = [
     description:
       "Multiplies your score by 4 for every grey (non-numeric) slot.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -760,6 +830,7 @@ export const TRINKETS = [
     effect: "bug",
     description: "What did you do? (Scores for 2560 points)",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -770,6 +841,7 @@ export const TRINKETS = [
     effect: "mechanical-arm",
     description: "Tool upgrades are much more likely to be Rare or Legendary.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -781,6 +853,7 @@ export const TRINKETS = [
     description:
       "Scores 5 (101 in binary) points every spin. When Robot sees a 0 or 1, permanently increase the points this gives by 2 (10 in binary).",
     kind: "trinket",
+    pointScoring: true,
     metadata: {
       power: 5,
     },
@@ -793,6 +866,7 @@ export const TRINKETS = [
     effect: "devil",
     description: "Scores 666 points when you score 3 consecutive 6s.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -803,6 +877,7 @@ export const TRINKETS = [
     effect: "no-tools",
     description: "If you didn't use any tools this round, score 120 points.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -814,6 +889,7 @@ export const TRINKETS = [
     description:
       "When acquired, copy a random trinket you own. (Ironically, cannot replicate Experiments.)",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
     price: 30,
   },
@@ -825,6 +901,7 @@ export const TRINKETS = [
     effect: "alembic",
     description: "Gain a random trinket. (Ignores rarities)",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
     price: 30,
   },
@@ -837,6 +914,7 @@ export const TRINKETS = [
     description:
       "When you land on every number from 0 to 9 in order, create a Legendary Trinket, then transform into Relaxed Face. Currently looking for:",
     kind: "trinket",
+    pointScoring: false,
     metadata: {
       nextDigit: 0,
     },
@@ -850,6 +928,7 @@ export const TRINKETS = [
     description:
       "If you've used tools exactly 5 times this spin, score 100 points and gain $20.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -858,8 +937,10 @@ export const TRINKETS = [
     emoji: "🦜",
     rarity: "legendary",
     effect: "parrot",
-    description: "Has the ability of ALL your common and uncommon trinkets.",
+    description:
+      "Repeat the point-scoring abilities of ALL your common and uncommon trinkets.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -870,6 +951,7 @@ export const TRINKETS = [
     effect: "scientist",
     description: "Experiments you already own can appear again in shops.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -881,6 +963,7 @@ export const TRINKETS = [
     description:
       "When you score your spin, multiply your score by 1.1x for every trinket that DIDN'T activate.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -892,6 +975,7 @@ export const TRINKETS = [
     description:
       "Dormant. Reaches its next stage when all three brainrot levels are assembled.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -902,6 +986,7 @@ export const TRINKETS = [
     effect: "dormant2",
     description: "Dormant. Score six 7s to wake me up.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -912,17 +997,20 @@ export const TRINKETS = [
     effect: "dormant3",
     description: 'Multiply your score by 67 for every "67" in your number.',
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
     id: "fax",
     name: "Fax Machine",
     emoji: "📠",
-    rarity: "uncommon",
+    rarity: "rare",
     effect: "fax",
     description: "Copy the ability of the trinket to the right of me.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
+    price: 34,
   },
   {
     id: "confettihorn",
@@ -932,6 +1020,7 @@ export const TRINKETS = [
     effect: "confettihorn",
     description: "Increase the goal reward by 30%.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -942,6 +1031,7 @@ export const TRINKETS = [
     effect: "partyface",
     description: "Increase the goal reward by 70%.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -952,6 +1042,7 @@ export const TRINKETS = [
     effect: "dud",
     description: "You Got the Dud! (Creates a new Dud after every spin.)",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -962,6 +1053,7 @@ export const TRINKETS = [
     effect: "rat",
     description: "For every three 3s scored, gain an Uncommon or Rare trinket.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {
       count: 0,
     },
@@ -973,8 +1065,9 @@ export const TRINKETS = [
     rarity: "uncommon",
     effect: "mechanic",
     description:
-      "After each spin, gain +$60. Reduce the payout by $6 each time you've used a tool this spin (min. $0).",
+      "After each spin, gain +$40. Reduce the payout by $4 each time you've used a tool this spin (min. $0).",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -985,6 +1078,7 @@ export const TRINKETS = [
     effect: "upgradeexp",
     description: "Gain a random Tool upgrade. (ignores rarities)",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
     price: 30,
   },
@@ -996,6 +1090,7 @@ export const TRINKETS = [
     effect: "toolexp",
     description: "Gain a random Rare Tool.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
     price: 30,
   },
@@ -1006,8 +1101,9 @@ export const TRINKETS = [
     rarity: "token",
     effect: "frog",
     description:
-      "After each spin, gain $10. Immune to Science (cannot be targeted by experiments).",
+      "After each spin, gain $25. Immune to Science (cannot be targeted by experiments).",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -1018,6 +1114,7 @@ export const TRINKETS = [
     effect: "fallingleaves",
     description: "When a trinket transforms, gain +$30. Cannot transform.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -1029,6 +1126,7 @@ export const TRINKETS = [
     description:
       "Scores 200 points each spin. When you have 2 bugs when you score, I eat them and grow up.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
   },
   {
@@ -1040,6 +1138,7 @@ export const TRINKETS = [
     description:
       "Repeat the ability of the three highest-scoring trinkets this spin, then reincarnate me.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -1051,6 +1150,7 @@ export const TRINKETS = [
     description:
       "When you land on every number from 0 to 9 in order, create a Rare Trinket. Currently looking for:",
     kind: "trinket",
+    pointScoring: false,
     metadata: {
       nextDigit: 0,
     },
@@ -1064,6 +1164,7 @@ export const TRINKETS = [
     description:
       "Gives you $4 when it sees its favorite number, then picks a new favorite number.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {
       favorite: 0,
     },
@@ -1077,6 +1178,7 @@ export const TRINKETS = [
     description:
       "Picks a favorite number every time you spin. Gives you $15 each time you score Lady Liberty's favorite number.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {
       favorite: 0,
     },
@@ -1089,6 +1191,7 @@ export const TRINKETS = [
     effect: "ferriswheel",
     description: "When you reroll the shop, gain $9.",
     kind: "trinket",
+    pointScoring: false,
     metadata: {},
   },
   {
@@ -1099,6 +1202,7 @@ export const TRINKETS = [
     effect: "waningcrescent",
     description: "Score 200 points for every grey (non-numeric) slot.",
     kind: "trinket",
+    pointScoring: true,
     metadata: {},
     price: 21,
   },
@@ -1445,7 +1549,7 @@ export const TOOLS = [
     rarity: "rare",
     effect: "magicwand",
     description:
-      "Permanently transform a trinket into a Frog that gives you $10 after each spin. (Frogs are also immune to science!)",
+      "Permanently transform a trinket into a Frog that gives you $25 after each spin. (Frogs are also immune to science!)",
     kind: "tool",
     maxUses: 1,
     limitedUse: false,

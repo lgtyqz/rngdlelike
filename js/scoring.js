@@ -1,7 +1,12 @@
 import { ITEMS } from "./items.js";
 import { hash, random } from "./random.js";
 import {
-  asScore, ratio, powerRatio, hasMultiplier, formatRatio, formatNumber,
+  asScore,
+  ratio,
+  powerRatio,
+  hasMultiplier,
+  formatRatio,
+  formatNumber,
 } from "./score.js";
 import {
   trinketEffects,
@@ -39,7 +44,8 @@ export function divisibilityStatus(id, reels) {
 
 // Contributions retain reel indices so the scoring animation reflects the actual rule.
 export function scoreTrinket(item, reels, state = null) {
-  if (item.metadata.power != null) item.metadata.power = asScore(item.metadata.power);
+  if (item.metadata.power != null)
+    item.metadata.power = asScore(item.metadata.power);
   // Bombs retain their tagged value in game state so they can count down and
   // render specially, but every scoring rule treats the countdown as a digit.
   reels = reels.map(reelValue);
@@ -206,8 +212,10 @@ export function scoreTrinket(item, reels, state = null) {
         multiplier = ratio(6.7);
       break;
     case "dormant3":
-      multiplier =
-        powerRatio(67, reels.filter((n, i) => n === 6 && reels[i + 1] === 7).length);
+      multiplier = powerRatio(
+        67,
+        reels.filter((n, i) => n === 6 && reels[i + 1] === 7).length,
+      );
       break;
     case "chick":
       flat(true, 200);
@@ -219,7 +227,7 @@ export function scoreTrinket(item, reels, state = null) {
       }
       break;
     case "mechanic":
-      cash = Math.max(0, 60 - 6 * (state?.toolsUsed ?? 0));
+      cash = Math.max(0, 40 - 4 * (state?.toolsUsed ?? 0));
       break;
     case "liberty":
       reels.forEach((n) => {
@@ -229,7 +237,10 @@ export function scoreTrinket(item, reels, state = null) {
       break;
     case "silent": {
       const stacks = state ? inactiveTrinketStacks(state) : [];
-      multiplier = powerRatio(1.1, stacks.reduce((sum, stack) => sum + stack.count, 0));
+      multiplier = powerRatio(
+        1.1,
+        stacks.reduce((sum, stack) => sum + stack.count, 0),
+      );
       note = stacks
         .map(
           (stack) =>
@@ -474,7 +485,7 @@ export function scoreTrinket(item, reels, state = null) {
     case "ferriswheel":
       break;
     case "frog":
-      cash += 10;
+      cash += 25;
       break;
     default:
       throw new Error(`Missing trinket effect: ${id}`);

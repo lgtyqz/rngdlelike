@@ -157,9 +157,14 @@ export function createRun(seed, mode = "normal", date = null) {
   const trinketRng = random(hash(`${state.seed}:starting-trinkets`));
   const toolRng = random(hash(`${state.seed}:starting-tools`));
   for (let i = 0; i < 2; i++) {
+    const needsScoringTrinket = i === 1 &&
+      !state.trinkets.some((item) => ITEMS[item.id].pointScoring);
     const def = choose(
       availableTrinkets.filter(
-        (t) => !["package", ...EXPERIMENTS].includes(t.id) && !has(state, t.id),
+        (t) =>
+          !["package", ...EXPERIMENTS].includes(t.id) &&
+          !has(state, t.id) &&
+          (!needsScoringTrinket || t.pointScoring),
       ),
       trinketRng,
     );
@@ -1168,6 +1173,13 @@ function activateAbility(state, item, context) {
   event.snailCount = item.id === "snail" ? 1 : 0;
   event.snailOwnerUids = item.id === "snail" ? [owner.uid] : [];
   state.bank += event.cash;
+  // Parrot carries this restriction through Fax: scoring and score growth only.
+  if (item.pointsOnly) {
+    if (event.points || hasMultiplier(event.multiplier) || event.flagCount)
+      markActivated(state, item);
+    event.id = ownerId;
+    return event;
+  }
   const roll = () => effectRng(state, item.id)();
   const notes = [];
   if (EXPERIMENTS.includes(item.id) && (!context.scoring || context.repeat)) {
@@ -1282,6 +1294,34 @@ function activateAbility(state, item, context) {
   // Copied abilities appear under their owner's name and icon.
   event.id = ownerId;
   return event;
+}
+
+/** Attributes the rounded goal-bonus increase without paying it a second time. */
+function annotateGoalBonuses(state, effects, regular, triggeredGoal) {
+  const regularByOwner = new Map(regular.map((event) => [event.ownerUid, event]));
+  const sources = effects
+    .filter((effect) => ["confettihorn", "partyface"].includes(effect.id))
+    .map((effect) => ({
+      event: regularByOwner.get(effect.owner.uid),
+      percent: effect.id === "confettihorn" ? 30 : 70,
+    }));
+  for (const event of state.events)
+    if (event.rewardBonus) sources.push({ event, percent: event.rewardBonus });
+  const base = bonusFor(state.round);
+  let percent = 100, previousReward = base;
+  for (const source of sources) {
+    percent += source.percent;
+    const reward = Math.ceil(base * percent / 100);
+    const cash = triggeredGoal ? reward - previousReward : 0;
+    previousReward = reward;
+    if (!source.event) continue;
+    const event = source.event;
+    event.goalBonusCash = (event.goalBonusCash ?? 0) + cash;
+    const note = triggeredGoal
+      ? `+$${formatNumber(cash)} goal bonus (+${source.percent}% of base reward)`
+      : "Goal not reached before The Silent: no bonus.";
+    event.note = [event.note, note].filter(Boolean).join("\n");
+  }
 }
 
 /** Resolves trinket effects, score multipliers, goal rewards, and round history. */
@@ -1457,6 +1497,7 @@ export function settleSpin(state, { skipPhoenix = false } = {}) {
     points >= goalFor(state.round)
       ? goalReward + 50 * state.reels.filter((n) => n === "W").length
       : 0;
+  annotateGoalBonuses(state, effects, regular, triggeredGoal);
   let runningBonus = points >= goalFor(state.round) ? goalReward : 0;
   state.reels.forEach((value, index) => {
     if (value !== "W") return;
