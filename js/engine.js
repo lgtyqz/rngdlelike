@@ -139,7 +139,7 @@ export function createRun(seed, mode = "normal", date = null) {
     date,
     round: 1,
     phase: "ready",
-    bank: 1e6,
+    bank: 10,
     total: 0n,
     points: 0n,
     reels: [0, 1, 2, 3, 4, 5],
