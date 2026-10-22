@@ -1007,6 +1007,10 @@ img#game-promo-logo {
   font-size: 24px;
   margin-top: 6px;
 }
+.price-warning {
+  font-size: 12px;
+  color: #888;
+}
 .offer:disabled,
 .offer.unaffordable {
   opacity: 0.42;
@@ -1927,8 +1931,13 @@ dialog form {
   color: #364352;
   font-size: 12px;
 }
-#tooltip .divisibility-status strong { font-size: 13px; }
-#tooltip .divisibility-status span { display: block; margin-top: 3px; }
+#tooltip .divisibility-status strong {
+  font-size: 13px;
+}
+#tooltip .divisibility-status span {
+  display: block;
+  margin-top: 3px;
+}
 #tooltip .divisibility-status.will-trigger {
   background: #e7f5eb;
   border-color: #80b791;
@@ -1953,9 +1962,17 @@ dialog form {
   animation: camera-feedback-in 250ms ease-out;
 }
 @keyframes camera-feedback-in {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .item .camera-feedback { animation: none; }
+  .item .camera-feedback {
+    animation: none;
+  }
 }

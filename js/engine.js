@@ -1,6 +1,15 @@
 import {
-  asScore, ratio, addRatio, multiplyRatio, powerRatio, roundRatio, compareRatio,
-  hasMultiplier, formatRatio, formatNumber, normalizeScores,
+  asScore,
+  ratio,
+  addRatio,
+  multiplyRatio,
+  powerRatio,
+  roundRatio,
+  compareRatio,
+  hasMultiplier,
+  formatRatio,
+  formatNumber,
+  normalizeScores,
 } from "./score.js";
 import {
   ITEMS,
@@ -30,6 +39,8 @@ import {
 export { scoreTrinket } from "./scoring.js";
 export const TOTAL_SPINS = 20;
 export const TOOL_CHANCE = 0.6;
+
+export const EXPONENTIAL_REROLL_COUNT = 14;
 /** Returns the point target for a given round. */
 export const goalFor = (round) => {
   if (round < 11) {
@@ -58,7 +69,7 @@ export const rerollPrice = (state) =>
       state.rerolls * 5 -
       2 * count(state, "wheel") -
       4 * count(state, "bicycle"),
-  );
+  ) * Math.ceil(1.5 ** (state.rerolls - EXPONENTIAL_REROLL_COUNT));
 
 /** Counts all owned copies, including clones, for stackable passive effects. */
 const count = (state, id) =>
@@ -128,7 +139,7 @@ export function createRun(seed, mode = "normal", date = null) {
     date,
     round: 1,
     phase: "ready",
-    bank: 10,
+    bank: 1e6,
     total: 0n,
     points: 0n,
     reels: [0, 1, 2, 3, 4, 5],
@@ -157,8 +168,8 @@ export function createRun(seed, mode = "normal", date = null) {
   const trinketRng = random(hash(`${state.seed}:starting-trinkets`));
   const toolRng = random(hash(`${state.seed}:starting-tools`));
   for (let i = 0; i < 2; i++) {
-    const needsScoringTrinket = i === 1 &&
-      !state.trinkets.some((item) => ITEMS[item.id].pointScoring);
+    const needsScoringTrinket =
+      i === 1 && !state.trinkets.some((item) => ITEMS[item.id].pointScoring);
     const def = choose(
       availableTrinkets.filter(
         (t) =>
@@ -1117,9 +1128,13 @@ function phoenixRanking(state) {
     const uids = event.silentCount ? event.silentOwnerUids : [event.ownerUid];
     for (const uid of uids) {
       if (uid == null) continue;
-      points.set(uid, addRatio(
-        points.get(uid) ?? 0n, ratio(event.points, BigInt(uids.length)),
-      ));
+      points.set(
+        uid,
+        addRatio(
+          points.get(uid) ?? 0n,
+          ratio(event.points, BigInt(uids.length)),
+        ),
+      );
     }
   }
   const phoenixOwners = new Set(
@@ -1298,7 +1313,9 @@ function activateAbility(state, item, context) {
 
 /** Attributes the rounded goal-bonus increase without paying it a second time. */
 function annotateGoalBonuses(state, effects, regular, triggeredGoal) {
-  const regularByOwner = new Map(regular.map((event) => [event.ownerUid, event]));
+  const regularByOwner = new Map(
+    regular.map((event) => [event.ownerUid, event]),
+  );
   const sources = effects
     .filter((effect) => ["confettihorn", "partyface"].includes(effect.id))
     .map((effect) => ({
@@ -1308,10 +1325,11 @@ function annotateGoalBonuses(state, effects, regular, triggeredGoal) {
   for (const event of state.events)
     if (event.rewardBonus) sources.push({ event, percent: event.rewardBonus });
   const base = bonusFor(state.round);
-  let percent = 100, previousReward = base;
+  let percent = 100,
+    previousReward = base;
   for (const source of sources) {
     percent += source.percent;
-    const reward = Math.ceil(base * percent / 100);
+    const reward = Math.ceil((base * percent) / 100);
     const cash = triggeredGoal ? reward - previousReward : 0;
     previousReward = reward;
     if (!source.event) continue;
@@ -1373,7 +1391,9 @@ export function settleSpin(state, { skipPhoenix = false } = {}) {
     }
     return !event.deferredSilent;
   });
-  let points = ratio(state.events.reduce((sum, event) => sum + event.points, 0n));
+  let points = ratio(
+    state.events.reduce((sum, event) => sum + event.points, 0n),
+  );
   for (const event of state.events) {
     if (hasMultiplier(event.multiplier)) {
       const before = points;
@@ -1389,8 +1409,12 @@ export function settleSpin(state, { skipPhoenix = false } = {}) {
       event.multiplierPoints = roundRatio(points) - roundRatio(before);
     }
   }
-  const multipliers = state.events.filter((event) => hasMultiplier(event.multiplier));
-  state.events = state.events.filter((event) => !hasMultiplier(event.multiplier));
+  const multipliers = state.events.filter((event) =>
+    hasMultiplier(event.multiplier),
+  );
+  state.events = state.events.filter(
+    (event) => !hasMultiplier(event.multiplier),
+  );
   for (const event of multipliers) {
     event.points += event.multiplierPoints;
     if (event.multiplierPoints && !["moai", "new moon"].includes(event.id))
@@ -1415,12 +1439,10 @@ export function settleSpin(state, { skipPhoenix = false } = {}) {
   const triggerPoints = roundRatio(points);
   const triggeredGoal = compareRatio(points, goalFor(state.round)) >= 0;
   const rewardPercent = triggeredGoal
-    ? 100 + 30 * effects.filter((t) => t.id === "confettihorn").length +
+    ? 100 +
+      30 * effects.filter((t) => t.id === "confettihorn").length +
       70 * effects.filter((t) => t.id === "partyface").length +
-      state.events.reduce(
-        (bonus, event) => bonus + (event.rewardBonus ?? 0),
-        0,
-      )
+      state.events.reduce((bonus, event) => bonus + (event.rewardBonus ?? 0), 0)
     : 100;
   for (const effect of effects) {
     if (triggeredGoal && ["confettihorn", "partyface"].includes(effect.id))
@@ -1492,7 +1514,7 @@ export function settleSpin(state, { skipPhoenix = false } = {}) {
   // Round once after all multipliers so totals, history, and rewards agree.
   points = roundRatio(points);
   state.points = points;
-  const goalReward = Math.ceil(bonusFor(state.round) * rewardPercent / 100);
+  const goalReward = Math.ceil((bonusFor(state.round) * rewardPercent) / 100);
   const bonus =
     points >= goalFor(state.round)
       ? goalReward + 50 * state.reels.filter((n) => n === "W").length
@@ -1850,5 +1872,5 @@ export function shareText(state, url, calendar = {}) {
         .join("") + (ranked.length > 5 ? ` (+${ranked.length - 5} more)` : "")
     );
   };
-  return `RNGdlelike - ${heading}\n${formatNumber(state.total)} points in ${state.history.length}/20 spins!\nGoals: ${state.history.filter((h) => h.bonus).length}/20 - Best spin: ${formatNumber(state.history.reduce((best, h) => asScore(h.points) > best ? asScore(h.points) : best, 0n))}\nTrinkets: ${summary(state.trinkets)}\nTools: ${summary(state.tools)}\nThink you can beat me? Play the same seed!\n${url}`;
+  return `RNGdlelike - ${heading}\n${formatNumber(state.total)} points in ${state.history.length}/20 spins!\nGoals: ${state.history.filter((h) => h.bonus).length}/20 - Best spin: ${formatNumber(state.history.reduce((best, h) => (asScore(h.points) > best ? asScore(h.points) : best), 0n))}\nTrinkets: ${summary(state.trinkets)}\nTools: ${summary(state.tools)}\nThink you can beat me? Play the same seed!\n${url}`;
 }

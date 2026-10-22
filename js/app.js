@@ -23,6 +23,7 @@ import {
   allowanceFor,
   rerollPrice,
   shareText,
+  EXPONENTIAL_REROLL_COUNT,
 } from "./engine.js";
 import {
   dailySeed,
@@ -758,14 +759,25 @@ function offers(animateSpawn = false) {
           REROLL!
         </button>
         <div class="price">$${rerollPrice(state)}</div>
+        <div class="price-warning">${
+          state.rerolls === EXPONENTIAL_REROLL_COUNT
+            ? "gonna have to pay up for more of those"
+            : state.rerolls === EXPONENTIAL_REROLL_COUNT + 1
+              ? "warned you."
+              : ""
+        }</div>
       </div>
     </div>
   `;
 }
 
 /** Pure goal-bonus contributions use the same cash ledger as other payouts. */
-const isCashEvent = (event) => event.cashOnly || ["w", "octopus"].includes(event.id) ||
-  (event.goalBonusCash != null && !event.points && !hasMultiplier(event.multiplier));
+const isCashEvent = (event) =>
+  event.cashOnly ||
+  ["w", "octopus"].includes(event.id) ||
+  (event.goalBonusCash != null &&
+    !event.points &&
+    !hasMultiplier(event.multiplier));
 const eventCash = (event) => (event.cash ?? 0) + (event.goalBonusCash ?? 0);
 
 /** Returns one scoring-event row for the animated score log. */
