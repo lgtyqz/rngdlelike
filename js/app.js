@@ -749,7 +749,9 @@ function offers(animateSpawn = false) {
 
   return `
     <div class="shop-shelf" style="--offer-count: ${state.offers.length}">
-      ${offerButtons}
+      <div class="shop-offers${state.offers.length > 7 ? " scrollable" : ""}"${state.offers.length > 7 ? ' tabindex="0" role="region" aria-label="Shop offers"' : ""}>
+        ${offerButtons}
+      </div>
       <div class="reroll-control">
         <button
           class="button small"

@@ -937,11 +937,23 @@ img#game-promo-logo {
 }
 .shop-shelf {
   display: grid;
-  grid-template-columns: repeat(var(--offer-count), minmax(0, 1fr)) 135px;
+  grid-template-columns: minmax(0, 1fr) 135px;
   gap: 8px;
   min-height: 173px;
   align-items: center;
   margin-top: -8px;
+}
+.shop-offers {
+  display: grid;
+  grid-template-columns: repeat(var(--offer-count), minmax(0, 1fr));
+  gap: inherit;
+  min-width: 0;
+  align-items: center;
+}
+.shop-offers.scrollable {
+  grid-template-columns: repeat(var(--offer-count), minmax(110px, 1fr));
+  overflow-x: scroll;
+  padding-block: 8px;
 }
 .offer {
   display: flex;
@@ -1495,7 +1507,7 @@ dialog form {
     font-size: 80px;
   }
   .shop-shelf {
-    grid-template-columns: repeat(var(--offer-count), minmax(0, 1fr)) 112px;
+    grid-template-columns: minmax(0, 1fr) 112px;
   }
   .reroll-control .button {
     padding: 10px 12px;
@@ -1607,7 +1619,7 @@ dialog form {
     margin-top: 26px;
   }
   .shop-shelf {
-    grid-template-columns: repeat(var(--offer-count), minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 6px;
     min-height: 190px;
   }
