@@ -604,6 +604,15 @@ export function useTool(state, id, target, source = null) {
   const tool = state.tools.find((t) => t.id === id),
     def = ITEMS[id];
   if (state.phase !== "editing" || !tool || tool.uses < 1) return false;
+  let targetItem = null;
+  if (def.target === "trinket") {
+    const targetId = Number.isInteger(target)
+      ? state.trinkets[target]?.id
+      : target;
+    // The oldest copy anchors the stack; tools act on its newest copy.
+    targetItem = state.trinkets.findLast((t) => t.id === targetId);
+    if (!targetItem) return false;
+  }
   const reel =
     def.target === "reel" &&
     Number.isInteger(target) &&
@@ -683,10 +692,7 @@ export function useTool(state, id, target, source = null) {
     case "pawn":
     case "dna":
     case "magicwand": {
-      const item = Number.isInteger(target)
-        ? state.trinkets[target]
-        : state.trinkets.find((t) => t.id === target);
-      if (!item) return false;
+      const item = targetItem;
       if (id === "pawn") {
         state.trinkets.splice(state.trinkets.lastIndexOf(item), 1);
         state.bank += 35;
@@ -803,11 +809,7 @@ export function useTool(state, id, target, source = null) {
       state.reels[target] = null;
       break;
     case "mirror": {
-      const item = Number.isInteger(target)
-        ? state.trinkets[target]
-        : state.trinkets.find((t) => t.id === target);
-      if (!item) return false;
-      cloneTrinket(state, item);
+      cloneTrinket(state, targetItem);
       break;
     }
     case "lock":
@@ -825,11 +827,8 @@ export function useTool(state, id, target, source = null) {
       break;
     }
     case "butterfly": {
-      const item = Number.isInteger(target)
-        ? state.trinkets[target]
-        : state.trinkets.find((t) => t.id === target);
+      const item = targetItem;
       if (
-        !item ||
         !canTransform(state, item) ||
         ITEMS[item.id].rarity === "token"
       )
@@ -846,10 +845,8 @@ export function useTool(state, id, target, source = null) {
       break;
     }
     case "sparkles": {
-      const item = Number.isInteger(target)
-        ? state.trinkets[target]
-        : state.trinkets.find((t) => t.id === target);
-      if (!item || !canTransform(state, item)) return false;
+      const item = targetItem;
+      if (!canTransform(state, item)) return false;
       const rarityIndex = trinketRarities.indexOf(ITEMS[item.id].rarity);
       if (rarityIndex < 0) {
         return false;
@@ -864,19 +861,15 @@ export function useTool(state, id, target, source = null) {
           !has(state, t.id) &&
           canGenerateTrinket(state, t.id),
       );
-      if (!candidates.length) {
-        acquire(state, "bug");
-      } else {
-        const replacement = choose(candidates, effectRng(state, "sparkles"));
-        transformTrinket(state, item, replacement.id);
-      }
+      const replacement = candidates.length
+        ? choose(candidates, effectRng(state, "sparkles"))
+        : ITEMS.bug;
+      transformTrinket(state, item, replacement.id);
       break;
     }
     case "camera": {
-      const item = Number.isInteger(target)
-        ? state.trinkets[target]
-        : state.trinkets.find((t) => t.id === target);
-      if (!item || PASSIVE_TRINKETS.has(item.id)) return false;
+      const item = targetItem;
+      if (PASSIVE_TRINKETS.has(item.id)) return false;
       const event = activate(state, item);
       cameraEvent = event;
       if (item.id === "no-tools") {
@@ -908,13 +901,9 @@ export function useTool(state, id, target, source = null) {
   if (tool.bonusUses > 0) tool.bonusUses--;
   state.bombEvents = (state.bombEvents ?? []).slice(previousBombEvents);
   recordSeen(state, seenIndices);
-  const cameraId = Number.isInteger(target)
-    ? state.trinkets[target]?.id
-    : target;
+  const cameraId = targetItem?.id;
   if (id === "camera" && ["realknife", "crystalball"].includes(cameraId)) {
-    const item = Number.isInteger(target)
-      ? state.trinkets[target]
-      : state.trinkets.find((t) => t.id === target);
+    const item = targetItem;
     const threshold = cameraId === "realknife" ? 9 : 8;
     const rewards = [
       ...new Set(state.seenEvents.map((event) => event.note).filter(Boolean)),
