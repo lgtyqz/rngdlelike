@@ -1875,7 +1875,11 @@ app.addEventListener("click", async (event) => {
       state[kind === "trinkets" ? "revealTrinket" : "revealTool"] = targetId;
       sound.play("buy");
       persist();
+      const shopScrollLeft = app.querySelector(".shop-offers")?.scrollLeft ?? 0;
       render({ animate: false });
+      app
+        .querySelector(".shop-offers")
+        ?.scrollTo({ left: shopScrollLeft, behavior: "instant" });
       for (const item of gainedTrinkets)
         document
           .querySelector(`#trinkets-bin [data-item="${item.id}"]`)

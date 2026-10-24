@@ -688,7 +688,7 @@ export function useTool(state, id, target, source = null) {
         : state.trinkets.find((t) => t.id === target);
       if (!item) return false;
       if (id === "pawn") {
-        state.trinkets.splice(state.trinkets.indexOf(item), 1);
+        state.trinkets.splice(state.trinkets.lastIndexOf(item), 1);
         state.bank += 35;
       } else if (id === "dna") {
         if (!["common", "uncommon"].includes(ITEMS[item.id].rarity))
@@ -1045,7 +1045,12 @@ function onAcquire(state, item, copied = false) {
   }
   if (id === "monkey" || id === "liberty")
     item.metadata.favorite = Math.floor(effectRng(state, id)() * 10);
-  if (id === "moai" && !copied && count(state, id) === 1)
+  // Fax copies the ability, but only physical Moai copies share initialization.
+  if (
+    id === "moai" &&
+    !copied &&
+    state.trinkets.filter((t) => t.id === id).length === 1
+  )
     item.metadata.favorite = chooseMoaiFavorite(state);
   if (id === "cartwheel")
     for (const t of state.tools.filter((t) => REROLLS.includes(t.id)))
